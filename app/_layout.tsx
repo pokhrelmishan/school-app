@@ -17,24 +17,15 @@ function AuthGate() {
 
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      const role = profile?.role;
-      switch (role) {
-        case 'admin':
-          router.replace('/(admin)/dashboard');
-          break;
-        case 'teacher':
-          router.replace('/(teacher)/classes');
-          break;
-        case 'parent':
-          router.replace('/(parent)/attendance');
-          break;
-        case 'student':
-          router.replace('/(student)/attendance');
-          break;
-        default:
-          router.replace('/');
-      }
+    } else if (user && profile?.role && inAuthGroup) {
+      const routes: Record<string, string> = {
+        admin: '/(admin)/dashboard',
+        teacher: '/(teacher)/classes',
+        parent: '/(parent)/attendance',
+        student: '/(student)/attendance',
+      };
+      const target = routes[profile.role];
+      if (target) router.replace(target as any);
     }
   }, [user, loading, profile, segments]);
 
