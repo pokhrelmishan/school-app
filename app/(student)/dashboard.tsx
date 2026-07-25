@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
@@ -9,15 +9,16 @@ export default function StudentDashboardScreen() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [attendanceSummary, setAttendanceSummary] = useState({ present: 0, absent: 0, late: 0, total: 0 });
   const [recentGrades, setRecentGrades] = useState<any[]>([]);
   const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
   const [recentNotices, setRecentNotices] = useState<any[]>([]);
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
     if (!user?.id) return;
-    setLoading(true);
+    if (!isRefresh) setLoading(true);
 
     try {
       const [attRes, gradeRes, assignRes, noticeRes] = await Promise.all([
@@ -58,6 +59,12 @@ export default function StudentDashboardScreen() {
 
   useEffect(() => { fetchData(); }, [user?.id]);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData(true);
+    setRefreshing(false);
+  };
+
   const attendanceRate = attendanceSummary.total > 0
     ? Math.round((attendanceSummary.present / attendanceSummary.total) * 100)
     : 0;
@@ -74,7 +81,7 @@ export default function StudentDashboardScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}>
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>{getGreeting()},</Text>
@@ -223,7 +230,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    ...SHADOWS.md,
+    ...SHADOWS.lg,
   },
   statHeader: {
     flexDirection: 'row',

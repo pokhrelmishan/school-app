@@ -1,282 +1,336 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput, Modal } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  TextInput,
+  Modal,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../lib/theme';
+import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 
-interface School {
-  id: string;
-  name: string;
-}
-
-interface Profile {
-  id: string;
-  full_name: string;
-  email: string;
-  role: string;
-}
-
-interface Class {
+interface ClassItem {
   id: string;
   name: string;
   grade_level: string;
   teacher_id: string;
-  teacher?: {
-    full_name: string;
-  } | null;
-  school?: {
-    name: string;
-  } | null;
+  teacher_name: string;
+  student_count: number;
+}
+
+interface Teacher {
+  id: string;
+  full_name: string;
 }
 
 export default function AdminClassesScreen() {
-  const { user } = useAuth();
-  const [schools, setSchools] = useState<School[]>([]);
-  const [teachers, setTeachers] = useState<Profile[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newClass, setNewClass] = useState({
-    name: '',
-    grade_level: '',
-    teacher_id: '',
-    school_id: ''
-  });
+  const router = useRouter();
+  const { profile } = useAuth();
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
+  const [newGradeLevel, setNewGradeLevel] = useState('');
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setErrorMsg(null);
+  useEffect(() => {
+    fetchClasses();
+    fetchTeachers();
+  }, []);
+
+  const fetchClasses = async () => {
+    if (!profile?.school_id) return;
     try {
-      // Fetch schools
-      const { data: schoolsData, error: schoolsError } = await supabase
-        .from('schools')
-        .select('id, name')
-        .order('name');
+      const { data: classData, error } = await supabase
+        .from('classes')
+        .select('id, name, grade_level, teacher_id')
+        .eq('school_id', profile.school_id)
+        .order('grade_level', { ascending: true });
 
-      // Fetch teachers
-      const { data: teachersData, error: teachersError } = await supabase
+      if (error) throw error;
+
+      const { data: enrollments } = await supabase
+        .from('class_enrollments')
+        .select('class_id');
+
+      const enrollmentCounts: Record<string, number> = {};
+      if (enrollments) {
+        for (const e of enrollments) {
+          enrollmentCounts[e.class_id] = (enrollmentCounts[e.class_id] || 0) + 1;
+        }
+      }
+
+      const teacherIds = [...new Set((classData || []).map((c) => c.teacher_id).filter(Boolean))];
+      let teacherMap: Record<string, string> = {};
+      if (teacherIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', teacherIds);
+        if (profiles) {
+          for (const p of profiles) {
+            teacherMap[p.id] = p.full_name;
+          }
+        }
+      }
+
+      const mapped: ClassItem[] = (classData || []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        grade_level: c.grade_level,
+        teacher_id: c.teacher_id,
+        teacher_name: teacherMap[c.teacher_id] || 'Unassigned',
+        student_count: enrollmentCounts[c.id] || 0,
+      }));
+
+      setClasses(mapped);
+    } catch (err) {
+      console.error('Error fetching classes:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTeachers = async () => {
+    if (!profile?.school_id) return;
+    try {
+      const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role')
+        .select('id, full_name')
+        .eq('school_id', profile.school_id)
         .eq('role', 'teacher')
         .order('full_name');
 
-      // Fetch classes with teacher and school info
-      const { data: classesData, error: classesError } = await supabase
-        .from('classes')
-        .select(`
-          id,
-          name,
-          grade_level,
-          teacher_id,
-          teacher:profiles!classes_teacher_id_fkey(full_name),
-          school:schools(name)
-        `)
-        .order('name');
-
-      if (schoolsError) {
-        setErrorMsg(schoolsError.message);
-      } else if (schoolsData) {
-        setSchools(schoolsData);
-      }
-
-      if (teachersError) {
-        setErrorMsg(teachersError.message);
-      } else if (teachersData) {
-        setTeachers(teachersData);
-      }
-
-      if (classesError) {
-        setErrorMsg(classesError.message);
-      } else if (classesData) {
-        const formattedClasses = classesData.map(cls => ({
-          ...cls,
-          teacher: cls.teacher ? (Array.isArray(cls.teacher) ? cls.teacher[0] : cls.teacher) : null,
-          school: cls.school ? (Array.isArray(cls.school) ? cls.school[0] : cls.school) : null
-        }));
-        setClasses(formattedClasses);
-      }
-
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'An error occurred fetching data');
-    } finally {
-      setLoading(false);
+      if (data) setTeachers(data);
+    } catch (err) {
+      console.error('Error fetching teachers:', err);
     }
   };
 
-  const handleAddClass = async () => {
-    if (!newClass.name || !newClass.grade_level || !newClass.teacher_id || !newClass.school_id) {
-      setErrorMsg('Please fill in all required fields');
+  const handleCreateClass = async () => {
+    if (!newClassName.trim() || !newGradeLevel.trim()) {
+      Alert.alert('Missing fields', 'Please enter class name and grade level.');
       return;
     }
-    
-    setLoading(true);
-    setErrorMsg(null);
-    
-    try {
-      const { data, error } = await supabase
-        .from('classes')
-        .insert({
-          name: newClass.name,
-          grade_level: newClass.grade_level,
-          teacher_id: newClass.teacher_id,
-          school_id: newClass.school_id,
-        })
-        .select(`
-          id,
-          name,
-          grade_level,
-          teacher_id,
-          teacher:profiles!classes_teacher_id_fkey(id, full_name),
-          school:schools(id, name)
-        `)
-        .single();
+    if (!profile?.school_id) return;
 
-      if (error) {
-        setErrorMsg(error.message);
-      } else if (data) {
-        const formattedClass = {
-          ...data,
-          teacher: data.teacher ? (Array.isArray(data.teacher) ? data.teacher[0] : data.teacher) : null,
-          school: data.school ? (Array.isArray(data.school) ? data.school[0] : data.school) : null
-        };
-        setClasses(prev => [...prev, formattedClass]);
-        
-        // Reset form
-        setNewClass({
-          name: '',
-          grade_level: '',
-          teacher_id: '',
-          school_id: ''
-        });
-        setShowAddModal(false);
-      }
+    setCreating(true);
+    try {
+      const { error } = await supabase.from('classes').insert({
+        name: newClassName.trim(),
+        grade_level: newGradeLevel.trim(),
+        teacher_id: selectedTeacherId || null,
+        school_id: profile.school_id,
+      });
+      if (error) throw error;
+
+      setModalVisible(false);
+      setNewClassName('');
+      setNewGradeLevel('');
+      setSelectedTeacherId(null);
+      fetchClasses();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'An error occurred adding class');
+      Alert.alert('Error', err.message || 'Failed to create class.');
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const handleDeleteClass = (item: ClassItem) => {
+    Alert.alert(
+      'Delete Class',
+      `Are you sure you want to delete "${item.name}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await supabase.from('class_enrollments').delete().eq('class_id', item.id);
+              const { error } = await supabase.from('classes').delete().eq('id', item.id);
+              if (error) throw error;
+              setClasses((prev) => prev.filter((c) => c.id !== item.id));
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete class.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderItem = ({ item }: { item: ClassItem }) => (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.7}
+      onPress={() => router.push(`/(admin)/class/${item.id}` as any)}
+      onLongPress={() => handleDeleteClass(item)}
+    >
+      <View style={styles.accent} />
+      <View style={styles.cardBody}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.className}>{item.name}</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>Grade {item.grade_level}</Text>
+          </View>
+        </View>
+        <View style={styles.cardMeta}>
+          <Text style={styles.teacherName}>
+            {'\u{1F3EB}'} {item.teacher_name}
+          </Text>
+          <Text style={styles.studentCount}>
+            {'\u{1F464}'} {item.student_count} student{item.student_count !== 1 ? 's' : ''}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.chevron}>{'\u{27A1}\uFE0F'}</Text>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>Class Management</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Classes</Text>
+      </View>
 
-      <TouchableOpacity 
-        style={styles.addButton}
-        onPress={() => setShowAddModal(true)}
-      >
-        <Text style={styles.addButtonText}>Add New Class</Text>
-      </TouchableOpacity>
-
-      {loading && classes.length === 0 ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
-      ) : errorMsg ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchData}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : classes.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No classes found.</Text>
+      {classes.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={{ fontSize: 64 }}>{'\u{1F4DA}'}</Text>
+          <Text style={styles.emptyTitle}>No Classes Yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Tap the + button to create your first class.
+          </Text>
         </View>
       ) : (
         <FlatList
           data={classes}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{item.name}</Text>
-              <Text style={styles.cardText}>Grade: {item.grade_level}</Text>
-              <Text style={styles.cardText}>Teacher: {item.teacher?.full_name || 'Unassigned'}</Text>
-              <Text style={styles.cardText}>School: {item.school?.name || 'Unknown'}</Text>
-            </View>
-          )}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
         />
       )}
 
-      <Modal
-        visible={showAddModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAddModal(false)}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => setModalVisible(true)}
       >
-        <View style={styles.modalOverlay}>
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+          />
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Class</Text>
-            
+            <Text style={styles.modalTitle}>Create New Class</Text>
+
+            <Text style={styles.inputLabel}>Class Name</Text>
             <TextInput
-              style={styles.modalInput}
-              placeholder="Class Name"
-              value={newClass.name}
-              onChangeText={(text) => setNewClass(prev => ({ ...prev, name: text }))}
+              style={styles.input}
+              placeholder='e.g. "Grade 10-A"'
+              placeholderTextColor={COLORS.textTertiary}
+              value={newClassName}
+              onChangeText={setNewClassName}
             />
-            
+
+            <Text style={styles.inputLabel}>Grade Level</Text>
             <TextInput
-              style={styles.modalInput}
-              placeholder="Grade Level"
-              value={newClass.grade_level}
-              onChangeText={(text) => setNewClass(prev => ({ ...prev, grade_level: text }))}
+              style={styles.input}
+              placeholder='e.g. "10"'
+              placeholderTextColor={COLORS.textTertiary}
+              value={newGradeLevel}
+              onChangeText={setNewGradeLevel}
+              keyboardType="number-pad"
             />
-            
-            <View style={styles.modalSelectContainer}>
-              <Text style={styles.modalLabel}>Teacher:</Text>
-              <View style={styles.teacherSelector}>
-                {teachers.map(teacher => (
-                  <TouchableOpacity
-                    key={teacher.id}
-                    style={[styles.teacherOption, newClass.teacher_id === teacher.id && styles.teacherOptionSelected]}
-                    onPress={() => setNewClass(prev => ({ ...prev, teacher_id: teacher.id }))}
-                  >
-                    <Text style={[styles.teacherOptionText, newClass.teacher_id === teacher.id && styles.teacherOptionTextSelected]}>
-                      {teacher.full_name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            
-            <View style={styles.modalSelectContainer}>
-              <Text style={styles.modalLabel}>School:</Text>
-              <View style={styles.schoolSelector}>
-                {schools.map(school => (
-                  <TouchableOpacity
-                    key={school.id}
-                    style={[styles.schoolOption, newClass.school_id === school.id && styles.schoolOptionSelected]}
-                    onPress={() => setNewClass(prev => ({ ...prev, school_id: school.id }))}
-                  >
-                    <Text style={[styles.schoolOptionText, newClass.school_id === school.id && styles.schoolOptionTextSelected]}>
-                      {school.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowAddModal(false)}
+
+            <Text style={styles.inputLabel}>Assign Teacher</Text>
+            <TouchableOpacity
+              style={styles.pickerBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (teachers.length === 0) {
+                  Alert.alert('No teachers', 'No teachers found in this school.');
+                  return;
+                }
+                Alert.alert(
+                  'Select Teacher',
+                  undefined,
+                  [
+                    { text: 'None', onPress: () => setSelectedTeacherId(null) },
+                    ...teachers.map((t) => ({
+                      text: t.full_name,
+                      onPress: () => setSelectedTeacherId(t.id),
+                    })),
+                  ]
+                );
+              }}
+            >
+              <Text
+                style={[
+                  styles.pickerText,
+                  !selectedTeacherId && { color: COLORS.textTertiary },
+                ]}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
+                {selectedTeacherId
+                  ? teachers.find((t) => t.id === selectedTeacherId)?.full_name || 'Unknown'
+                  : 'Tap to select a teacher'}
+              </Text>
+              <Text style={styles.pickerChevron}>{'\u{25BC}'}</Text>
+            </TouchableOpacity>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleAddClass}
-                disabled={loading}
+                style={[styles.createBtn, creating && { opacity: 0.6 }]}
+                onPress={handleCreateClass}
+                disabled={creating}
               >
-                <Text style={styles.modalButtonText}>{loading ? 'Saving...' : 'Save'}</Text>
+                {creating ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text style={styles.createBtnText}>Create Class</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -286,186 +340,203 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
-    padding: 16,
+    padding: 20,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 20,
   },
-  addButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  addButtonText: {
-    color: COLORS.surface,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  loader: {
-    marginTop: 32,
-  },
-  errorContainer: {
-    padding: 16,
-    backgroundColor: COLORS.surfaceAlt,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  errorText: {
-    color: COLORS.danger,
-    marginBottom: 8,
-  },
-  retryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: COLORS.primaryDark,
-    borderRadius: 6,
-  },
-  retryText: {
-    color: COLORS.surface,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  emptyText: {
-    color: COLORS.textSecondary,
-    fontSize: 16,
-    textAlign: 'center',
+  list: {
+    paddingBottom: 100,
   },
   card: {
-    backgroundColor: COLORS.surfaceAlt,
-    borderRadius: 8,
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
+    alignItems: 'center',
+    overflow: 'hidden',
+    ...SHADOWS.sm,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 8,
+  accent: {
+    width: 4,
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 2,
+    marginRight: 12,
   },
-  cardText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  modalOverlay: {
+  cardBody: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  className: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  badge: {
+    backgroundColor: COLORS.primaryBg,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  cardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 6,
+  },
+  teacherName: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  studentCount: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  chevron: {
+    marginLeft: 8,
+    fontSize: 18,
+    color: COLORS.textSecondary,
+  },
+  emptyState: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.lg,
+  },
+  fabText: {
+    fontSize: 28,
+    color: COLORS.white,
+    lineHeight: 30,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
   modalContent: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: COLORS.text,
     marginBottom: 20,
-    textAlign: 'center',
   },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    padding: 12,
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: 6,
+  },
+  input: {
     backgroundColor: COLORS.surfaceAlt,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: COLORS.text,
     marginBottom: 16,
   },
-  modalSelectContainer: {
-    marginBottom: 16,
-  },
-  modalLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: 8,
-  },
-  teacherSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  teacherOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  teacherOptionSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  teacherOptionText: {
-    color: COLORS.text,
-    fontSize: 14,
-  },
-  teacherOptionTextSelected: {
-    color: COLORS.surface,
-    fontWeight: '600',
-  },
-  schoolSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  schoolOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  schoolOptionSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  schoolOptionText: {
-    color: COLORS.text,
-    fontSize: 14,
-  },
-  schoolOptionTextSelected: {
-    color: COLORS.surface,
-    fontWeight: '600',
-  },
-  modalButtonRow: {
+  pickerBtn: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 20,
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceAlt,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 24,
   },
-  modalButton: {
+  pickerText: {
+    fontSize: 15,
+    color: COLORS.text,
+  },
+  pickerChevron: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: COLORS.surfaceAlt,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: COLORS.textSecondary,
-  },
-  saveButton: {
-    backgroundColor: COLORS.primary,
-  },
-  modalButtonText: {
-    color: COLORS.surface,
+  cancelBtnText: {
+    fontSize: 15,
     fontWeight: '600',
-    fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  createBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+  },
+  createBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 });

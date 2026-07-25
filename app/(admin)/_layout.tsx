@@ -1,86 +1,98 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import { COLORS } from '../../lib/theme';
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    Dashboard: '▦',
-    Users: '♟',
-    Classes: '▤',
-    Reports: '◈',
-    Settings: '⚙',
-    Seed: '✦',
-  };
-  return (
-    <Text style={{ fontSize: 20, color: focused ? COLORS.primary : COLORS.textTertiary, opacity: focused ? 1 : 0.6 }}>
-      {icons[label] || '●'}
-    </Text>
-  );
+function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
+  return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.4 }}>{emoji}</Text>;
 }
 
 export default function AdminLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: COLORS.primaryDark,
-          borderTopColor: COLORS.textSecondary,
-          borderTopWidth: 0.5,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textTertiary,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabLabel,
+        headerShown: false,
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ focused }) => <TabIcon label="Dashboard" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="users"
         options={{
           title: 'Users',
-          tabBarIcon: ({ focused }) => <TabIcon label="Users" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon emoji="👥" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="classes"
         options={{
           title: 'Classes',
-          tabBarIcon: ({ focused }) => <TabIcon label="Classes" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📚" focused={focused} />,
         }}
       />
       <Tabs.Screen
-        name="reports"
+        name="subjects"
         options={{
-          title: 'Reports',
-          tabBarIcon: ({ focused }) => <TabIcon label="Reports" focused={focused} />,
+          title: 'Subjects',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📖" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="grades"
+        options={{
+          title: 'Grades',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ focused }) => <TabIcon label="Settings" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" focused={focused} />,
         }}
       />
       <Tabs.Screen
-        name="seed"
+        name="class/[classId]"
         options={{
-          title: 'Seed',
-          tabBarIcon: ({ focused }) => <TabIcon label="Seed" focused={focused} />,
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="grades/[classId]"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: COLORS.surface,
+    borderTopColor: COLORS.borderLight,
+    borderTopWidth: 1,
+    height: 64,
+    paddingBottom: 10,
+    paddingTop: 8,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+});

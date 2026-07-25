@@ -34,14 +34,15 @@ export default function StudentAttendanceScreen() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const today = new Date();
   const [month, setMonth] = useState(today.getMonth());
   const [year, setYear] = useState(today.getFullYear());
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
     if (!user?.id) return;
-    setLoading(true);
+    if (!isRefresh) setLoading(true);
     const [attRes, evtRes] = await Promise.all([
       supabase.from('attendance_records').select('id, date, status, notes, class:classes(name, grade_level)').eq('student_id', user.id).order('date', { ascending: false }),
       supabase.from('events').select('id, title, event_date, event_type'),
@@ -52,6 +53,12 @@ export default function StudentAttendanceScreen() {
   };
 
   useEffect(() => { if (user?.id) fetchData(); }, [user?.id]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData(true);
+    setRefreshing(false);
+  };
 
   const navigateMonth = (dir: number) => {
     let m = month + dir;
@@ -173,6 +180,8 @@ export default function StudentAttendanceScreen() {
           data={records}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           renderItem={({ item }) => {
             const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
             return (

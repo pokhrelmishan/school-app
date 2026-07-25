@@ -1,305 +1,176 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
-import { useRouter } from 'expo-router';
 
-interface School {
+interface StatCard {
+  label: string;
+  count: number;
+  accent: string;
+}
+
+interface RecentUser {
   id: string;
-  name: string;
-  logo_url: string | null;
+  full_name: string;
+  role: string;
   created_at: string;
 }
 
-interface Profile {
-  id: string;
-  full_name: string;
-  email: string;
-  role: string;
-  school_id: string;
-}
-
-interface Class {
-  id: string;
-  name: string;
-  grade_level: string;
-  teacher_id: string;
-  teacher?: { full_name: string } | null;
-}
-
-export default function AdminDashboardScreen() {
-  const { user, profile } = useAuth();
+export default function AdminDashboard() {
   const router = useRouter();
-  const [schools, setSchools] = useState<School[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
+  const { profile } = useAuth();
+  const [schoolName, setSchoolName] = useState('School');
+  const [stats, setStats] = useState<StatCard[]>([
+    { label: 'Teachers', count: 0, accent: COLORS.primary },
+    { label: 'Students', count: 0, accent: COLORS.success },
+    { label: 'Classes', count: 0, accent: COLORS.warning },
+    { label: 'Subjects', count: 0, accent: COLORS.danger },
+  ]);
+  const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'classes'>('overview');
 
-  const fetchData = async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const errors: string[] = [];
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!profile?.school_id) return;
 
-      const { data: schoolsData, error: schoolsError } = await supabase
-        .from('schools')
-        .select('id, name, logo_url, created_at')
-        .order('name');
+      const [schoolRes, teachersRes, studentsRes, classesRes, subjectsRes, usersRes] =
+        await Promise.all([
+          supabase.from('schools').select('name').eq('id', profile.school_id).single(),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id).eq('role', 'teacher'),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id).eq('role', 'student'),
+          supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id),
+          supabase.from('subjects').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id),
+          supabase.from('profiles').select('id, full_name, role, created_at').eq('school_id', profile.school_id).order('created_at', { ascending: false }).limit(5),
+        ]);
 
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name');
+      if (schoolRes.data) setSchoolName(schoolRes.data.name);
 
-      const { data: classesData, error: classesError } = await supabase
-        .from('classes')
-        .select(`
-          id, name, grade_level, teacher_id,
-          teacher:profiles!classes_teacher_id_fkey(full_name)
-        `)
-        .order('name');
+      setStats([
+        { label: 'Teachers', count: teachersRes.count ?? 0, accent: COLORS.primary },
+        { label: 'Students', count: studentsRes.count ?? 0, accent: COLORS.success },
+        { label: 'Classes', count: classesRes.count ?? 0, accent: COLORS.warning },
+        { label: 'Subjects', count: subjectsRes.count ?? 0, accent: COLORS.danger },
+      ]);
 
-      if (schoolsError) errors.push(schoolsError.message);
-      else if (schoolsData) setSchools(schoolsData);
-
-      if (profilesError) errors.push(profilesError.message);
-      else if (profilesData) setProfiles(profilesData);
-
-      if (classesError) errors.push(classesError.message);
-      else if (classesData) {
-        setClasses(classesData.map(cls => ({
-          ...cls,
-          teacher: cls.teacher ? (Array.isArray(cls.teacher) ? cls.teacher[0] : cls.teacher) : null,
-        })));
-      }
-
-      if (errors.length > 0) setErrorMsg(errors.join('; '));
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'An error occurred');
-    } finally {
+      if (usersRes.data) setRecentUsers(usersRes.data);
       setLoading(false);
+    };
+
+    fetchData();
+  }, [profile?.school_id]);
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'teacher': return COLORS.primaryBg;
+      case 'student': return COLORS.successBg;
+      case 'admin': return COLORS.warningBg;
+      default: return COLORS.surfaceAlt;
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
-
-  const teacherCount = profiles.filter(p => p.role === 'teacher').length;
-  const studentCount = profiles.filter(p => p.role === 'student').length;
-  const parentCount = profiles.filter(p => p.role === 'parent').length;
-
-  const StatCard = ({ label, value, color }: { label: string; value: number; color: string }) => (
-    <View style={styles.statCard}>
-      <View style={[styles.statAccent, { backgroundColor: color }]} />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-
-  const SectionHeader = ({ title }: { title: string }) => (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionLine} />
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionLine} />
-    </View>
-  );
-
-  const OverviewTab = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={styles.statGrid}>
-        <StatCard label="Schools" value={schools.length} color={COLORS.danger} />
-        <StatCard label="Teachers" value={teacherCount} color={COLORS.primary} />
-        <StatCard label="Students" value={studentCount} color={COLORS.success} />
-        <StatCard label="Parents" value={parentCount} color={COLORS.textSecondary} />
-      </View>
-
-      <SectionHeader title="Schools" />
-      {schools.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🏫</Text>
-          <Text style={styles.emptyText}>No schools yet</Text>
-          <Text style={styles.emptyHint}>Create your first school in the Schools tab</Text>
-        </View>
-      ) : (
-        schools.map(school => (
-          <View key={school.id} style={styles.card}>
-            <View style={[styles.cardAccent, { backgroundColor: COLORS.danger }]} />
-            <View style={styles.cardBody}>
-              <Text style={styles.cardTitle}>{school.name}</Text>
-              <Text style={styles.cardMeta}>Created {new Date(school.created_at).toLocaleDateString()}</Text>
-            </View>
-          </View>
-        ))
-      )}
-
-      <SectionHeader title="Recent Users" />
-      {profiles.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>👥</Text>
-          <Text style={styles.emptyText}>No users yet</Text>
-          <Text style={styles.emptyHint}>Users will appear here once they sign up</Text>
-        </View>
-      ) : (
-        profiles.slice(0, 5).map(user => (
-          <View key={user.id} style={styles.card}>
-            <View style={[styles.cardAccent, { backgroundColor: getRoleColor(user.role) }]} />
-            <View style={styles.cardBody}>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardTitle}>{user.full_name}</Text>
-                <View style={[styles.badge, { backgroundColor: getRoleColor(user.role) + '20' }]}>
-                  <Text style={[styles.badgeText, { color: getRoleColor(user.role) }]}>{getRoleDisplay(user.role)}</Text>
-                </View>
-              </View>
-              <Text style={styles.cardMeta}>{user.email}</Text>
-            </View>
-          </View>
-        ))
-      )}
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
-  );
-
-  const UsersTab = () => {
-    const grouped = [
-      { role: 'admin', users: profiles.filter(p => p.role === 'admin'), color: COLORS.danger },
-      { role: 'teacher', users: profiles.filter(p => p.role === 'teacher'), color: COLORS.primary },
-      { role: 'student', users: profiles.filter(p => p.role === 'student'), color: COLORS.success },
-      { role: 'parent', users: profiles.filter(p => p.role === 'parent'), color: COLORS.textSecondary },
-    ];
-
-    return (
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {grouped.map(({ role, users, color }) => (
-          users.length > 0 && (
-            <View key={role} style={{ marginBottom: 24 }}>
-              <SectionHeader title={`${getRoleDisplay(role)}s (${users.length})`} />
-              {users.map(u => (
-                <View key={u.id} style={styles.card}>
-                  <View style={[styles.cardAccent, { backgroundColor: color }]} />
-                  <View style={styles.cardBody}>
-                    <View style={styles.cardRow}>
-                      <Text style={styles.cardTitle}>{u.full_name}</Text>
-                      <View style={[styles.badge, { backgroundColor: color + '20' }]}>
-                        <Text style={[styles.badgeText, { color }]}>{getRoleDisplay(u.role)}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.cardMeta}>{u.email}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )
-        ))}
-        {profiles.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>👥</Text>
-            <Text style={styles.emptyText}>No users yet</Text>
-            <Text style={styles.emptyHint}>Users will appear once they sign up and create a profile</Text>
-          </View>
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    );
-  };
-
-  const ClassesTab = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      {classes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📚</Text>
-          <Text style={styles.emptyText}>No classes yet</Text>
-          <Text style={styles.emptyHint}>Create classes from the Classes tab</Text>
-        </View>
-      ) : (
-        classes.map(cls => (
-          <View key={cls.id} style={styles.card}>
-            <View style={[styles.cardAccent, { backgroundColor: COLORS.primary }]} />
-            <View style={styles.cardBody}>
-              <Text style={styles.cardTitle}>{cls.name}</Text>
-              <Text style={styles.cardMeta}>Grade {cls.grade_level}</Text>
-              <Text style={styles.cardMeta}>Teacher: {cls.teacher?.full_name || 'Unassigned'}</Text>
-            </View>
-          </View>
-        ))
-      )}
-      <View style={{ height: 40 }} />
-    </ScrollView>
-  );
-
-  const getRoleColor = (role: string) => {
+  const getRoleBadgeText = (role: string) => {
     switch (role) {
-      case 'admin': return COLORS.danger;
       case 'teacher': return COLORS.primary;
       case 'student': return COLORS.success;
-      case 'parent': return COLORS.textSecondary;
-      default: return COLORS.text;
+      case 'admin': return COLORS.warning;
+      default: return COLORS.textSecondary;
     }
   };
 
-  const getRoleDisplay = (role: string) => role.charAt(0).toUpperCase() + role.slice(1);
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
-  const primarySchool = schools[0];
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          {primarySchool?.logo_url ? (
-            <Image source={{ uri: primarySchool.logo_url }} style={styles.headerLogo} />
-          ) : (
-            <View style={styles.headerLogoPlaceholder}>
-              <Text style={styles.headerLogoText}>{primarySchool?.name?.charAt(0) || 'E'}</Text>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>{primarySchool?.name || 'Dashboard'}</Text>
-            <Text style={styles.headerSubtitle}>Welcome back</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => router.push('/(admin)/settings')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.headerAvatar}>
-              <Text style={styles.headerAvatarText}>{(profile?.full_name || 'A')[0]}</Text>
-            </View>
-          </TouchableOpacity>
+        <View style={styles.headerText}>
+          <Text style={styles.schoolName}>{schoolName}</Text>
+          <Text style={styles.subtitle}>Welcome back</Text>
         </View>
+        <TouchableOpacity onPress={() => router.push('/(admin)/profile' as any)}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {profile?.full_name?.charAt(0)?.toUpperCase() ?? 'A'}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.tabContainer}>
-        {(['overview', 'users', 'classes'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-          </TouchableOpacity>
+      <View style={styles.statsGrid}>
+        {stats.map((stat) => (
+          <View key={stat.label} style={[styles.statCard, SHADOWS.sm]}>
+            <View style={[styles.statAccent, { backgroundColor: stat.accent }]} />
+            <Text style={styles.statCount}>{stat.count}</Text>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+          </View>
         ))}
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 48 }} />
-      ) : errorMsg ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={{ flex: 1 }}>
-          {activeTab === 'overview' && <OverviewTab />}
-          {activeTab === 'users' && <UsersTab />}
-          {activeTab === 'classes' && <ClassesTab />}
-        </View>
-      )}
-    </View>
+      <Text style={styles.sectionTitle}>Recent Activity</Text>
+      <View style={styles.activityCard}>
+        {recentUsers.length === 0 ? (
+          <Text style={styles.emptyText}>No recent activity</Text>
+        ) : (
+          recentUsers.map((user) => (
+            <View key={user.id} style={styles.activityRow}>
+              <View style={styles.activityInfo}>
+                <Text style={styles.activityName}>{user.full_name}</Text>
+                <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(user.role) }]}>
+                  <Text style={[styles.roleBadgeText, { color: getRoleBadgeText(user.role) }]}>
+                    {user.role}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.activityDate}>{formatDate(user.created_at)}</Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={[styles.actionCard, SHADOWS.sm]}
+          onPress={() => router.push('/(admin)/users' as any)}
+        >
+          <Text style={styles.actionEmoji}>👤</Text>
+          <Text style={styles.actionLabel}>Add User</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionCard, SHADOWS.sm]}
+          onPress={() => router.push('/(admin)/classes' as any)}
+        >
+          <Text style={styles.actionEmoji}>📚</Text>
+          <Text style={styles.actionLabel}>Manage Classes</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionCard, SHADOWS.sm]}
+          onPress={() => router.push('/(admin)/grades' as any)}
+        >
+          <Text style={styles.actionEmoji}>📊</Text>
+          <Text style={styles.actionLabel}>Enter Grades</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -308,224 +179,152 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
+  content: {
+    padding: 20,
+    paddingBottom: 32,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+  },
   header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.primaryDark,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.surface,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: COLORS.textTertiary,
-    marginTop: 4,
-  },
-  headerRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 14,
+    marginBottom: 24,
   },
-  headerLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.textSecondary,
+  headerText: {
+    flex: 1,
   },
-  headerLogoPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerLogoText: {
+  schoolName: {
     fontSize: 22,
-    fontWeight: '800',
-    color: COLORS.surface,
+    fontWeight: '700',
+    color: COLORS.text,
   },
-  headerAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+  subtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.surface + '30',
   },
-  headerAvatarText: {
+  avatarText: {
+    color: COLORS.white,
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.surface,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.primaryDark,
-    paddingHorizontal: 16,
-    paddingBottom: 0,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: COLORS.primary,
-  },
-  tabText: {
-    color: COLORS.textTertiary,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  tabTextActive: {
-    color: COLORS.surface,
-  },
-  statGrid: {
+  statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 16,
-    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
   statCard: {
-    width: '47%',
-    backgroundColor: COLORS.surfaceAlt,
-    borderRadius: 12,
+    width: '48%',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
     padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
+    marginBottom: 12,
+    overflow: 'hidden',
   },
   statAccent: {
-    width: 24,
-    height: 4,
-    borderRadius: 2,
-    marginBottom: 12,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
   },
-  statValue: {
-    fontSize: 32,
-    fontWeight: '800',
+  statCount: {
+    fontSize: 28,
+    fontWeight: '700',
     color: COLORS.text,
+    marginTop: 6,
   },
   statLabel: {
     fontSize: 13,
     color: COLORS.textSecondary,
-    marginTop: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  sectionLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.border,
+    marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginHorizontal: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 12,
   },
-  card: {
-    flexDirection: 'row',
+  activityCard: {
     backgroundColor: COLORS.surface,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 10,
-    overflow: 'hidden',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 24,
     ...SHADOWS.sm,
   },
-  cardAccent: {
-    width: 5,
-  },
-  cardBody: {
-    flex: 1,
-    padding: 14,
-  },
-  cardRow: {
+  activityRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 10,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+  activityInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  activityName: {
+    fontSize: 14,
+    fontWeight: '500',
     color: COLORS.text,
   },
-  cardMeta: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  badge: {
+  roleBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  badgeText: {
+  roleBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 32,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
+  activityDate: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
   },
   emptyText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  emptyHint: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
+    fontSize: 13,
+    color: COLORS.textTertiary,
     textAlign: 'center',
+    paddingVertical: 12,
   },
-  errorBox: {
-    margin: 16,
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
     padding: 16,
-    backgroundColor: COLORS.surfaceAlt,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.danger + '30',
+    marginHorizontal: 4,
     alignItems: 'center',
   },
-  errorText: {
-    color: COLORS.danger,
-    marginBottom: 10,
+  actionEmoji: {
+    fontSize: 26,
+    marginBottom: 8,
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text,
     textAlign: 'center',
-  },
-  retryBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: COLORS.surface,
-    fontWeight: '700',
   },
 });

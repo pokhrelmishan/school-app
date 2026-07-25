@@ -18,11 +18,12 @@ export default function StudentGradesScreen() {
   const { user } = useAuth();
   const [grades, setGrades] = useState<GradeEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
 
-  const fetchGrades = async () => {
+  const fetchGrades = async (isRefresh = false) => {
     if (!user?.id) return;
-    setLoading(true);
+    if (!isRefresh) setLoading(true);
     let q = supabase
       .from('grade_entries')
       .select('id, title, score, max_score, term, created_at, class:classes(name, grade_level)')
@@ -35,6 +36,12 @@ export default function StudentGradesScreen() {
   };
 
   useEffect(() => { fetchGrades(); }, [user?.id, selectedTerm]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchGrades(true);
+    setRefreshing(false);
+  };
 
   const getGradeStats = () => {
     if (grades.length === 0) return null;
@@ -51,8 +58,8 @@ export default function StudentGradesScreen() {
 
   const stats = getGradeStats();
 
-  const gradeColor = (pct: number) => pct >= 90 ? COLORS.success : pct >= 70 ? COLORS.primary : pct >= 50 ? COLORS.warning : COLORS.danger;
-  const gradeBg = (pct: number) => pct >= 90 ? COLORS.successBg : pct >= 70 ? COLORS.primaryBg : pct >= 50 ? COLORS.warningBg : COLORS.dangerBg;
+  const gradeColor = (pct: number) => pct >= 70 ? COLORS.success : pct >= 50 ? COLORS.warning : COLORS.danger;
+  const gradeBg = (pct: number) => pct >= 70 ? COLORS.successBg : pct >= 50 ? COLORS.warningBg : COLORS.dangerBg;
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
 
@@ -102,6 +109,8 @@ export default function StudentGradesScreen() {
           data={grades}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           renderItem={({ item }) => {
             const pct = Math.round((item.score / item.max_score) * 100);
             const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;

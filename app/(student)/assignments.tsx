@@ -18,9 +18,10 @@ export default function StudentAssignmentsScreen() {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchAssignments = async () => {
-    setLoading(true);
+  const fetchAssignments = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
     const { data } = await supabase
       .from('assignments')
       .select('id, title, description, due_date, created_at, class:classes(name), assignment_attachments(id, file_url, file_name)')
@@ -31,12 +32,19 @@ export default function StudentAssignmentsScreen() {
 
   useEffect(() => { if (user?.id) fetchAssignments(); }, [user?.id]);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAssignments(true);
+    setRefreshing(false);
+  };
+
   const getDaysLeft = (d: string) => {
     if (!d) return null;
     const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
-    if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, overdue: true };
-    if (diff === 0) return { text: 'Due today', overdue: false };
-    return { text: `${diff}d left`, overdue: false };
+    if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, overdue: true, dueSoon: false };
+    if (diff === 0) return { text: 'Due today', overdue: false, dueSoon: true };
+    if (diff <= 3) return { text: `${diff}d left`, overdue: false, dueSoon: true };
+    return { text: `${diff}d left`, overdue: false, dueSoon: false };
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
@@ -54,21 +62,23 @@ export default function StudentAssignmentsScreen() {
           data={assignments}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           renderItem={({ item }) => {
             const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
             const days = getDaysLeft(item.due_date);
             const attachments = item.assignment_attachments || [];
 
             return (
-              <View style={[styles.card, days?.overdue && styles.cardOverdue]}>
+              <View style={[styles.card, days?.overdue && styles.cardOverdue, days?.dueSoon && !days?.overdue && styles.cardDueSoon]}>
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{item.title}</Text>
                     <Text style={styles.cardClass}>{className}</Text>
                   </View>
                   {days && (
-                    <View style={[styles.badge, { backgroundColor: days.overdue ? COLORS.dangerBg : COLORS.primaryBg }]}>
-                      <Text style={[styles.badgeText, { color: days.overdue ? COLORS.danger : COLORS.primary }]}>{days.text}</Text>
+                    <View style={[styles.badge, { backgroundColor: days.overdue ? COLORS.dangerBg : days.dueSoon ? COLORS.warningBg : COLORS.successBg }]}>
+                      <Text style={[styles.badgeText, { color: days.overdue ? COLORS.danger : days.dueSoon ? COLORS.warning : COLORS.success }]}>{days.text}</Text>
                     </View>
                   )}
                 </View>
@@ -116,6 +126,7 @@ const styles = StyleSheet.create({
     ...SHADOWS.sm,
   },
   cardOverdue: { borderLeftColor: COLORS.danger },
+  cardDueSoon: { borderLeftColor: COLORS.warning },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
   cardClass: { fontSize: 13, color: COLORS.textSecondary },
