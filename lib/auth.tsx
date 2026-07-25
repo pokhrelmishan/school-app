@@ -9,7 +9,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthState['profile']>;
   logout: () => Promise<void>;
 }
 
@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', userId)
       .single();
     setProfile(data ?? null);
+    return data ?? null;
   };
 
   useEffect(() => {
@@ -60,7 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     setUser(data.user);
     if (data.user) {
-      await fetchProfile(data.user.id);
+      const p = await fetchProfile(data.user.id);
+      return p;
     }
   };
 

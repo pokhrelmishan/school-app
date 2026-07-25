@@ -14,7 +14,7 @@ function AuthGate() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    const inRoleGroup = ['(admin)', '(teacher)', '(student)', '(parent)'].includes(segments[0] as string);
+    const inRoleGroup = ['(admin)', '(teacher)', '(student)'].includes(segments[0] as string);
 
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
@@ -49,7 +49,6 @@ function AuthGate() {
       <Stack.Screen name="(admin)" options={{ headerShown: false }} />
       <Stack.Screen name="(teacher)" options={{ headerShown: false }} />
       <Stack.Screen name="(student)" options={{ headerShown: false }} />
-      <Stack.Screen name="(parent)" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
     </Stack>
   );

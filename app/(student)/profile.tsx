@@ -1,10 +1,16 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useAuth } from '../../lib/auth';
 import { COLORS, SHADOWS } from '../../lib/theme';
+import { getSavedAccounts, removeAccount, type SavedAccount } from '../../lib/accounts';
 
 export default function StudentProfileScreen() {
   const { user, profile, logout } = useAuth();
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+
+  useEffect(() => {
+    getSavedAccounts().then(setSavedAccounts);
+  }, []);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -13,13 +19,30 @@ export default function StudentProfileScreen() {
     ]);
   };
 
+  const handleRemoveAccount = (account: SavedAccount) => {
+    Alert.alert('Remove Account', `Remove ${account.email}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await removeAccount(account.email);
+          const accounts = await getSavedAccounts();
+          setSavedAccounts(accounts);
+        },
+      },
+    ]);
+  };
+
+  const otherAccounts = savedAccounts.filter(a => a.email !== user?.email);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.avatarLarge}>
           <Text style={styles.avatarText}>{(profile?.full_name || 'S')[0]}</Text>
         </View>
@@ -43,10 +66,43 @@ export default function StudentProfileScreen() {
           </View>
         </View>
 
+        {otherAccounts.length > 0 && (
+          <View style={styles.switchSection}>
+            <Text style={styles.sectionLabel}>Switch Account</Text>
+            {otherAccounts.map((account) => (
+              <TouchableOpacity
+                key={account.email}
+                style={styles.switchCard}
+                onPress={() => {
+                  Alert.alert('Switch Account', `Switch to ${account.full_name || account.email}?`, [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Switch',
+                      onPress: async () => {
+                        await logout();
+                      },
+                    },
+                  ]);
+                }}
+                onLongPress={() => handleRemoveAccount(account)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.switchAvatar}>
+                  <Text style={styles.switchAvatarText}>{(account.full_name || account.email)[0].toUpperCase()}</Text>
+                </View>
+                <View style={styles.switchInfo}>
+                  <Text style={styles.switchName}>{account.full_name || account.email}</Text>
+                  <Text style={styles.switchEmail}>{account.email}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -65,7 +121,7 @@ const styles = StyleSheet.create({
     color: COLORS.surface,
     letterSpacing: -0.5,
   },
-  content: { flex: 1, alignItems: 'center', padding: 24 },
+  content: { alignItems: 'center', padding: 24 },
   avatarLarge: {
     width: 88,
     height: 88,
@@ -96,6 +152,45 @@ const styles = StyleSheet.create({
   infoValue: { fontSize: 14, fontWeight: '600', color: COLORS.text, textTransform: 'capitalize' },
   infoValueMono: { fontSize: 14, fontWeight: '600', color: COLORS.text, fontFamily: 'Courier' },
   infoDivider: { height: 1, backgroundColor: COLORS.borderLight },
+  switchSection: {
+    width: '100%',
+    marginTop: 24,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  switchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  switchAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: COLORS.primaryBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  switchAvatarText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  switchInfo: { flex: 1 },
+  switchName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  switchEmail: { fontSize: 12, color: COLORS.textSecondary },
   logoutButton: {
     width: '100%',
     backgroundColor: COLORS.surface,

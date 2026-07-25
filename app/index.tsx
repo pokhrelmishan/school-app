@@ -5,7 +5,7 @@ import { COLORS, SHADOWS } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
-const roles = ['admin', 'teacher', 'student', 'parent'] as const;
+const roles = ['admin', 'teacher', 'student'] as const;
 
 export default function Dashboard() {
   const { user, loading, profile, logout } = useAuth();
