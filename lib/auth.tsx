@@ -32,23 +32,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        setUser(data.user);
-        await fetchProfile(data.user.id);
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (data.user) {
+          setUser(data.user);
+          await fetchProfile(data.user.id);
+        }
+      } catch (err) {
+        console.error('Auth init error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchUser();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
+      try {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+      } catch (err) {
+        console.error('Auth state error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
