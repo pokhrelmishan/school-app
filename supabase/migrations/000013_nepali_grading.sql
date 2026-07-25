@@ -1,19 +1,18 @@
--- Migration 000013: Nepali-style grading system
--- theory_score + practical_score per subject, overall GPA
+-- Migration 000013: Grading system
+-- Letter grades (A+, A, B+, etc.) + GPA per subject, overall GPA
 
 -- Add new columns to grade_entries
-ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS theory_score NUMERIC;
-ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS practical_score NUMERIC;
-ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS theory_max NUMERIC DEFAULT 75;
-ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS practical_max NUMERIC DEFAULT 25;
 ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS subject_name TEXT;
+ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS grade_letter TEXT;
+ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS subject_gpa NUMERIC;
+ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS overall_gpa NUMERIC;
 
--- Migrate old data: if score exists but theory doesn't, put score into theory
+-- Migrate old data
 UPDATE grade_entries
 SET theory_score = score, theory_max = COALESCE(max_score, 100)
 WHERE theory_score IS NULL AND score IS NOT NULL;
 
--- Update RLS: class teachers can insert/update grades for their classes
+-- RLS: class teachers can insert/update grades for their classes
 DROP POLICY IF EXISTS "grades_insert" ON grade_entries;
 DROP POLICY IF EXISTS "grades_update" ON grade_entries;
 

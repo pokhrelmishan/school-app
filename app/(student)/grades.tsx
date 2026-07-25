@@ -8,12 +8,9 @@ interface GradeEntry {
   id: string;
   title: string;
   subject_name: string | null;
-  theory_score: number | null;
-  practical_score: number | null;
-  theory_max: number;
-  practical_max: number;
-  score: number;
-  max_score: number;
+  grade_letter: string | null;
+  subject_gpa: number | null;
+  overall_gpa: number | null;
   term: string;
   created_at: string;
   class?: { name: string; grade_level: string };
@@ -31,7 +28,7 @@ export default function StudentGradesScreen() {
     if (!isRefresh) setLoading(true);
     let q = supabase
       .from('grade_entries')
-      .select('id, title, subject_name, theory_score, practical_score, theory_max, practical_max, score, max_score, term, created_at, class:classes(name, grade_level)')
+      .select('id, title, subject_name, grade_letter, subject_gpa, overall_gpa, term, created_at, class:classes(name, grade_level)')
       .eq('student_id', user.id)
       .order('created_at', { ascending: false });
     if (selectedTerm) q = q.eq('term', selectedTerm);
@@ -52,50 +49,28 @@ export default function StudentGradesScreen() {
     return Array.from(new Set(grades.map(g => g.term))).sort((a, b) => b.localeCompare(a));
   };
 
-  const getGradeStats = () => {
-    if (grades.length === 0) return null;
-
-    const bySubject: Record<string, { name: string; entries: GradeEntry[] }> = {};
-    for (const g of grades) {
-      const subName = g.subject_name ?? 'Unknown';
-      const subId = subName;
-      if (!bySubject[subId]) bySubject[subId] = { name: subName, entries: [] };
-      bySubject[subId].entries.push(g);
-    }
-
-    const subjectTotals = Object.values(bySubject).map(s => {
-      const total = s.entries.reduce((sum, e) => sum + (e.theory_score ?? e.score ?? 0) + (e.practical_score ?? 0), 0);
-      const max = s.entries.reduce((sum, e) => sum + (e.theory_max + e.practical_max), 0);
-      const gpa = max > 0 ? total / 10 : 0;
-      return { name: s.name, total, max, gpa };
-    });
-
-    const overallTotal = subjectTotals.reduce((s, x) => s + x.total, 0);
-    const overallMax = subjectTotals.reduce((s, x) => s + x.max, 0);
-    const overallGpa = overallMax > 0 ? overallTotal / 10 : 0;
-
-    return { subjectTotals, overallGpa, count: grades.length };
+  const getOverallGpa = () => {
+    const withGpa = grades.filter(g => g.overall_gpa != null);
+    if (withGpa.length === 0) return null;
+    return withGpa[0].overall_gpa;
   };
 
-  const gpaColor = (gpa: number) => gpa >= 7 ? COLORS.success : gpa >= 5 ? COLORS.warning : COLORS.danger;
-  const gpaBg = (gpa: number) => gpa >= 7 ? COLORS.successBg : gpa >= 5 ? COLORS.warningBg : COLORS.dangerBg;
+  const gpaColor = (g: number) => g >= 3.5 ? COLORS.success : g >= 2.5 ? COLORS.warning : COLORS.danger;
+  const gpaBg = (g: number) => g >= 3.5 ? COLORS.successBg : g >= 2.5 ? COLORS.warningBg : COLORS.dangerBg;
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
 
-  const stats = getGradeStats();
+  const overallGpa = getOverallGpa();
 
   return (
     <View style={styles.container}>
       <Text style={styles.headerTitle}>Grades</Text>
 
-      {stats && stats.subjectTotals.length > 0 && (
+      {overallGpa != null && (
         <View style={styles.summaryCard}>
           <Text style={styles.gpaLabel}>Overall GPA</Text>
-          <Text style={[styles.gpaValue, { color: gpaColor(stats.overallGpa) }]}>{stats.overallGpa.toFixed(1)}</Text>
-          <Text style={styles.gpaSubLabel}>/ 10</Text>
-          <View style={styles.summaryBar}>
-            <View style={[styles.summaryBarFill, { width: `${Math.min(stats.overallGpa * 10, 100)}%`, backgroundColor: gpaColor(stats.overallGpa) }]} />
-          </View>
+          <Text style={[styles.gpaValue, { color: gpaColor(overallGpa) }]}>{Number(overallGpa).toFixed(1)}</Text>
+          <Text style={styles.gpaSubLabel}>/ 4.0</Text>
         </View>
       )}
 
@@ -123,55 +98,24 @@ export default function StudentGradesScreen() {
           showsVerticalScrollIndicator={false}
           refreshing={refreshing}
           onRefresh={onRefresh}
-          ListHeaderComponent={stats && stats.subjectTotals.length > 0 ? (
-            <View style={styles.subjectSummarySection}>
-              <Text style={styles.sectionLabel}>Subjects</Text>
-              {stats.subjectTotals.map((s, i) => (
-                <View key={i} style={styles.subjectSummaryRow}>
-                  <Text style={styles.subjectSummaryName}>{s.name}</Text>
-                  <View style={styles.subjectSummaryScores}>
-                    <Text style={styles.subjectScoreText}>{s.total}/{s.max}</Text>
-                    <View style={[styles.gpaPill, { backgroundColor: gpaBg(s.gpa) }]}>
-                      <Text style={[styles.gpaPillText, { color: gpaColor(s.gpa) }]}>{s.gpa.toFixed(1)}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
           renderItem={({ item }) => {
-            const theory = item.theory_score ?? 0;
-            const practical = item.practical_score ?? 0;
-            const total = theory + practical;
-            const max = (item.theory_max ?? 75) + (item.practical_max ?? 25);
-            const pct = max > 0 ? Math.round((total / max) * 100) : 0;
             const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
-            const subjectName = item.subject_name ?? '';
             return (
               <View style={styles.card}>
                 <View style={styles.cardRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardMeta}>{subjectName ? `${subjectName} · ` : ''}{className} · {item.term}</Text>
+                    <Text style={styles.cardTitle}>{item.subject_name ?? 'Subject'}</Text>
+                    <Text style={styles.cardMeta}>{item.title} · {className} · {item.term}</Text>
                   </View>
-                  <View style={[styles.pill, { backgroundColor: gpaBg(pct / 10) }]}>
-                    <Text style={[styles.pillText, { color: gpaColor(pct / 10) }]}>{pct}%</Text>
-                  </View>
-                </View>
-                <View style={styles.scoreBreakdown}>
-                  <View style={styles.scoreItem}>
-                    <Text style={styles.scoreItemLabel}>Theory</Text>
-                    <Text style={styles.scoreItemValue}>{theory} / {item.theory_max ?? 75}</Text>
-                  </View>
-                  <View style={styles.scoreDivider} />
-                  <View style={styles.scoreItem}>
-                    <Text style={styles.scoreItemLabel}>Practical</Text>
-                    <Text style={styles.scoreItemValue}>{practical} / {item.practical_max ?? 25}</Text>
-                  </View>
-                  <View style={styles.scoreDivider} />
-                  <View style={styles.scoreItem}>
-                    <Text style={styles.scoreItemLabel}>Total</Text>
-                    <Text style={[styles.scoreItemValue, { color: gpaColor(total / 10) }]}>{total} / {max}</Text>
+                  <View style={styles.rightSection}>
+                    {item.grade_letter ? (
+                      <View style={[styles.gradePill, { backgroundColor: COLORS.primaryBg }]}>
+                        <Text style={[styles.gradePillText, { color: COLORS.primary }]}>{item.grade_letter}</Text>
+                      </View>
+                    ) : null}
+                    {item.subject_gpa != null ? (
+                      <Text style={[styles.gpaSmall, { color: gpaColor(item.subject_gpa) }]}>{Number(item.subject_gpa).toFixed(1)}</Text>
+                    ) : null}
                   </View>
                 </View>
               </View>
@@ -199,8 +143,6 @@ const styles = StyleSheet.create({
   gpaLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
   gpaValue: { fontSize: 52, fontWeight: '800', marginTop: 4 },
   gpaSubLabel: { fontSize: 15, color: COLORS.textSecondary, marginTop: 2 },
-  summaryBar: { width: '100%', height: 6, backgroundColor: COLORS.surfaceAlt, borderRadius: 3, marginTop: 16 },
-  summaryBarFill: { height: 6, borderRadius: 3 },
 
   termRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   termPill: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
@@ -208,27 +150,15 @@ const styles = StyleSheet.create({
   termPillText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
   termPillTextActive: { color: COLORS.textInverse },
 
-  subjectSummarySection: { marginBottom: 16 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
-  subjectSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 6 },
-  subjectSummaryName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  subjectSummaryScores: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  subjectScoreText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '600' },
-  gpaPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  gpaPillText: { fontSize: 14, fontWeight: '700' },
-
   emptyContainer: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: COLORS.textTertiary, fontSize: 15 },
 
   card: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 10, ...SHADOWS.sm },
-  cardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  cardTitle: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  cardRow: { flexDirection: 'row', alignItems: 'center' },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
   cardMeta: { fontSize: 13, color: COLORS.textSecondary },
-  pill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
-  pillText: { fontSize: 14, fontWeight: '700' },
-  scoreBreakdown: { flexDirection: 'row', alignItems: 'center' },
-  scoreItem: { flex: 1, alignItems: 'center' },
-  scoreItemLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 2 },
-  scoreItemValue: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  scoreDivider: { width: 1, height: 28, backgroundColor: COLORS.border, marginHorizontal: 4 },
+  rightSection: { alignItems: 'flex-end', gap: 4 },
+  gradePill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
+  gradePillText: { fontSize: 15, fontWeight: '700' },
+  gpaSmall: { fontSize: 14, fontWeight: '700' },
 });
