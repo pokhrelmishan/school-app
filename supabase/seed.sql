@@ -117,7 +117,8 @@ BEGIN
     (v_class1_id, v_student3_id, current_date - interval '4 days', 'late'),
     (v_class1_id, v_student1_id, current_date - interval '5 days', 'present'),
     (v_class1_id, v_student2_id, current_date - interval '5 days', 'absent'),
-    (v_class1_id, v_student3_id, current_date - interval '5 days', 'present');
+    (v_class1_id, v_student3_id, current_date - interval '5 days', 'present')
+  ON CONFLICT DO NOTHING;
 
   -- Create attendance records for Science class
   INSERT INTO public.attendance_records (class_id, student_id, date, status)
@@ -130,27 +131,30 @@ BEGIN
     (v_class2_id, v_student5_id, current_date - interval '2 days', 'absent'),
     (v_class2_id, v_student3_id, current_date - interval '3 days', 'present'),
     (v_class2_id, v_student4_id, current_date - interval '3 days', 'present'),
-    (v_class2_id, v_student5_id, current_date - interval '3 days', 'present');
+    (v_class2_id, v_student5_id, current_date - interval '3 days', 'present')
+  ON CONFLICT DO NOTHING;
 
   -- Create grade entries for Math
-  INSERT INTO public.grade_entries (class_id, student_id, title, score, max_score, date)
+  INSERT INTO public.grade_entries (class_id, student_id, title, score, max_score, term)
   VALUES
-    (v_class1_id, v_student1_id, 'Midterm Exam', 88, 100, current_date - interval '3 days'),
-    (v_class1_id, v_student2_id, 'Midterm Exam', 76, 100, current_date - interval '3 days'),
-    (v_class1_id, v_student3_id, 'Midterm Exam', 92, 100, current_date - interval '3 days'),
-    (v_class1_id, v_student1_id, 'Homework 1', 18, 20, current_date - interval '5 days'),
-    (v_class1_id, v_student2_id, 'Homework 1', 15, 20, current_date - interval '5 days'),
-    (v_class1_id, v_student3_id, 'Homework 1', 20, 20, current_date - interval '5 days');
+    (v_class1_id, v_student1_id, 'Midterm Exam', 88, 100, 'Term 1'),
+    (v_class1_id, v_student2_id, 'Midterm Exam', 76, 100, 'Term 1'),
+    (v_class1_id, v_student3_id, 'Midterm Exam', 92, 100, 'Term 1'),
+    (v_class1_id, v_student1_id, 'Homework 1', 18, 20, 'Term 1'),
+    (v_class1_id, v_student2_id, 'Homework 1', 15, 20, 'Term 1'),
+    (v_class1_id, v_student3_id, 'Homework 1', 20, 20, 'Term 1')
+  ON CONFLICT DO NOTHING;
 
   -- Create grade entries for Science
-  INSERT INTO public.grade_entries (class_id, student_id, title, score, max_score, date)
+  INSERT INTO public.grade_entries (class_id, student_id, title, score, max_score, term)
   VALUES
-    (v_class2_id, v_student3_id, 'Lab Report 1', 45, 50, current_date - interval '2 days'),
-    (v_class2_id, v_student4_id, 'Lab Report 1', 38, 50, current_date - interval '2 days'),
-    (v_class2_id, v_student5_id, 'Lab Report 1', 42, 50, current_date - interval '2 days'),
-    (v_class2_id, v_student3_id, 'Quiz 1', 9, 10, current_date - interval '4 days'),
-    (v_class2_id, v_student4_id, 'Quiz 1', 7, 10, current_date - interval '4 days'),
-    (v_class2_id, v_student5_id, 'Quiz 1', 8, 10, current_date - interval '4 days');
+    (v_class2_id, v_student3_id, 'Lab Report 1', 45, 50, 'Term 1'),
+    (v_class2_id, v_student4_id, 'Lab Report 1', 38, 50, 'Term 1'),
+    (v_class2_id, v_student5_id, 'Lab Report 1', 42, 50, 'Term 1'),
+    (v_class2_id, v_student3_id, 'Quiz 1', 9, 10, 'Term 1'),
+    (v_class2_id, v_student4_id, 'Quiz 1', 7, 10, 'Term 1'),
+    (v_class2_id, v_student5_id, 'Quiz 1', 8, 10, 'Term 1')
+  ON CONFLICT DO NOTHING;
 
   RAISE NOTICE 'Demo data seeded successfully!';
 END $$;
