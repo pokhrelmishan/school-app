@@ -1,10 +1,39 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useAuth } from '../../lib/auth';
 import { COLORS, SHADOWS } from '../../lib/theme';
+import { supabase } from '../../lib/supabase';
 
 export default function TeacherProfileScreen() {
   const { user, profile, logout } = useAuth();
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id) return;
+
+      const [subjectsRes, classesRes] = await Promise.all([
+        supabase
+          .from('teacher_subjects')
+          .select('subjects(name)')
+          .eq('teacher_id', user.id),
+        supabase
+          .from('classes')
+          .select('name')
+          .eq('teacher_id', user.id),
+      ]);
+
+      if (subjectsRes.data) {
+        setSubjects(subjectsRes.data.map((s: any) => s.subjects?.name).filter(Boolean));
+      }
+      if (classesRes.data) {
+        setClasses(classesRes.data.map((c: any) => c.name).filter(Boolean));
+      }
+    };
+
+    fetchData();
+  }, [user?.id]);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -29,7 +58,21 @@ export default function TeacherProfileScreen() {
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Role</Text>
-            <Text style={styles.infoValue}>{profile?.role}</Text>
+            <Text style={styles.infoValue}>{profile?.role || 'Teacher'}</Text>
+          </View>
+          <View style={styles.infoDivider} />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Subjects</Text>
+            <Text style={styles.infoValue}>
+              {subjects.length > 0 ? subjects.join(', ') : '—'}
+            </Text>
+          </View>
+          <View style={styles.infoDivider} />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Classes</Text>
+            <Text style={styles.infoValue}>
+              {classes.length > 0 ? classes.join(', ') : '—'}
+            </Text>
           </View>
         </View>
 
@@ -55,7 +98,7 @@ const styles = StyleSheet.create({
     color: COLORS.surface,
     letterSpacing: -0.5,
   },
-  content: { flex: 1, alignItems: 'center', padding: 24 },
+  content: { alignItems: 'center', padding: 24 },
   avatarLarge: {
     width: 88,
     height: 88,
@@ -84,7 +127,6 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 14, color: COLORS.textSecondary },
   infoValue: { fontSize: 14, fontWeight: '600', color: COLORS.text, textTransform: 'capitalize' },
-  infoValueMono: { fontSize: 14, fontWeight: '600', color: COLORS.text, fontFamily: 'Courier' },
   infoDivider: { height: 1, backgroundColor: COLORS.borderLight },
   logoutButton: {
     width: '100%',
