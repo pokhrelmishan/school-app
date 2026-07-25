@@ -71,10 +71,17 @@ export default function StudentLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ focused }) => <TabIcon icon="✉️" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="notices"
         options={{
           title: 'Notices',
-          tabBarIcon: ({ focused }) => <TabIcon icon="🔔" focused={focused} />,
+          href: null,
         }}
       />
       <Tabs.Screen
