@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth';
 interface GradeEntry {
   id: string;
   title: string;
+  subject_name: string | null;
   theory_score: number | null;
   practical_score: number | null;
   theory_max: number;
@@ -15,7 +16,6 @@ interface GradeEntry {
   max_score: number;
   term: string;
   created_at: string;
-  subject?: { id: string; name: string };
   class?: { name: string; grade_level: string };
 }
 
@@ -31,7 +31,7 @@ export default function StudentGradesScreen() {
     if (!isRefresh) setLoading(true);
     let q = supabase
       .from('grade_entries')
-      .select('id, title, theory_score, practical_score, theory_max, practical_max, score, max_score, term, created_at, subject:subjects(id, name), class:classes(name, grade_level)')
+      .select('id, title, subject_name, theory_score, practical_score, theory_max, practical_max, score, max_score, term, created_at, class:classes(name, grade_level)')
       .eq('student_id', user.id)
       .order('created_at', { ascending: false });
     if (selectedTerm) q = q.eq('term', selectedTerm);
@@ -57,8 +57,8 @@ export default function StudentGradesScreen() {
 
     const bySubject: Record<string, { name: string; entries: GradeEntry[] }> = {};
     for (const g of grades) {
-      const subName = g.subject?.name ?? 'Unknown';
-      const subId = g.subject?.id ?? subName;
+      const subName = g.subject_name ?? 'Unknown';
+      const subId = subName;
       if (!bySubject[subId]) bySubject[subId] = { name: subName, entries: [] };
       bySubject[subId].entries.push(g);
     }
@@ -146,7 +146,7 @@ export default function StudentGradesScreen() {
             const max = (item.theory_max ?? 75) + (item.practical_max ?? 25);
             const pct = max > 0 ? Math.round((total / max) * 100) : 0;
             const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
-            const subjectName = item.subject?.name ?? '';
+            const subjectName = item.subject_name ?? '';
             return (
               <View style={styles.card}>
                 <View style={styles.cardRow}>

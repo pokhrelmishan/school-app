@@ -6,9 +6,12 @@ import { COLORS, SHADOWS } from '../../../lib/theme';
 import { useAuth } from '../../../lib/auth';
 
 interface ClassInfo { id: string; name: string; grade_level: string; teacher_id: string; }
-interface Subject { id: string; name: string; }
 interface Student { id: string; full_name: string; email: string; roll_number?: string; }
-interface GradeEntry { id: string; student_id: string; subject_id: string; title: string; theory_score: number | null; practical_score: number | null; theory_max: number; practical_max: number; term: string; }
+interface SavedGrade { id: string; student_id: string; title: string; subject_name: string; theory_score: number | null; practical_score: number | null; theory_max: number; practical_max: number; term: string; }
+interface SubjectRow { key: string; name: string; theory: string; practical: string; }
+
+let rowCounter = 0;
+const newRow = (name = ''): SubjectRow => ({ key: `row_${Date.now()}_${rowCounter++}`, name, theory: '', practical: '' });
 
 export default function TeacherGradesEntryScreen() {
   const { classId } = useLocalSearchParams<{ classId: string }>();
@@ -17,16 +20,14 @@ export default function TeacherGradesEntryScreen() {
 
   const [classInfo, setClassInfo] = useState<ClassInfo | null>(null);
   const [isClassTeacher, setIsClassTeacher] = useState(false);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [allGrades, setAllGrades] = useState<GradeEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Step 1: list of students | Step 2: selected student's subjects
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [term, setTerm] = useState('Term 1');
   const [title, setTitle] = useState('');
-  const [scores, setScores] = useState<Record<string, { theory: string; practical: string }>>({});
+  const [rows, setRows] = useState<SubjectRow[]>([newRow(), newRow(), newRow()]);
+  const [savedGrades, setSavedGrades] = useState<SavedGrade[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { fetchData(); }, [classId]);
@@ -41,21 +42,12 @@ export default function TeacherGradesEntryScreen() {
         setIsClassTeacher(classRes.data.teacher_id === user.id);
       }
 
-      const subRes = await supabase.from('teacher_subjects').select('subject_id, subjects(id, name)').eq('class_id', classId);
-      if (subRes.data) {
-        const allSubjects: Subject[] = subRes.data.map((s: any) => ({ id: s.subjects?.id ?? s.subject_id, name: s.subjects?.name ?? '' })).filter((s: Subject) => s.id && s.name);
-        setSubjects(Array.from(new Map(allSubjects.map(s => [s.id, s])).values()));
-      }
-
       const enrollRes = await supabase.from('class_enrollments').select('student:profiles!class_enrollments_student_id_fkey(id, full_name, email, roll_number)').eq('class_id', classId);
       if (enrollRes.data) {
         setStudents(enrollRes.data.map((e: any) => ({
           id: e.student?.id, full_name: e.student?.full_name ?? '', email: e.student?.email ?? '', roll_number: e.student?.roll_number ?? ''
         })).filter((s: Student) => s.id));
       }
-
-      const gradesRes = await supabase.from('grade_entries').select('id, student_id, subject_id, title, theory_score, practical_score, theory_max, practical_max, term').eq('class_id', classId);
-      if (gradesRes.data) setAllGrades(gradesRes.data as GradeEntry[]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -63,33 +55,73 @@ export default function TeacherGradesEntryScreen() {
     }
   };
 
-  const getStudentGrades = (studentId: string) => {
-    return allGrades.filter(g => g.student_id === studentId && g.term === term && g.title === title);
+  const loadStudentGrades = async (studentId: string) => {
+    const { data } = await supabase
+      .from('grade_entries')
+      .select('id, student_id, title, subject_name, theory_score, practical_score, theory_max, practical_max, term')
+      .eq('class_id', classId)
+      .eq('student_id', studentId);
+    if (data) setSavedGrades(data as SavedGrade[]);
   };
 
-  const handleScoreChange = (subjectId: string, field: 'theory' | 'practical', value: string) => {
-    setScores(prev => {
-      const key = subjectId;
-      return { ...prev, [key]: { ...prev[key], [field]: value } };
-    });
+  const handleSelectStudent = async (student: Student) => {
+    setSelectedStudent(student);
+    setRows([newRow(), newRow(), newRow()]);
+    setTerm('Term 1');
+    setTitle('');
+    await loadStudentGrades(student.id);
   };
+
+  const updateRow = (key: string, field: 'name' | 'theory' | 'practical', value: string) => {
+    setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r));
+  };
+
+  const addRow = () => setRows(prev => [...prev, newRow()]);
+
+  const removeRow = (key: string) => {
+    if (rows.length <= 1) return;
+    setRows(prev => prev.filter(r => r.key !== key));
+  };
+
+  const getRowTotal = (row: SubjectRow) => {
+    const t = parseFloat(row.theory) || 0;
+    const p = parseFloat(row.practical) || 0;
+    return t + p;
+  };
+
+  const getRowGpa = (row: SubjectRow) => getRowTotal(row) / 10;
+
+  const getOverallGpa = () => {
+    const graded = rows.filter(r => r.name.trim() && (parseFloat(r.theory) > 0 || parseFloat(r.practical) > 0));
+    if (graded.length === 0) return 0;
+    const sum = graded.reduce((acc, r) => acc + getRowTotal(r), 0);
+    return sum / graded.length / 10;
+  };
+
+  const gpaColor = (g: number) => g >= 7 ? COLORS.success : g >= 5 ? COLORS.warning : COLORS.danger;
+  const gpaBg = (g: number) => g >= 7 ? COLORS.successBg : g >= 5 ? COLORS.warningBg : COLORS.dangerBg;
 
   const handleSave = async () => {
     if (!title.trim()) { Alert.alert('Error', 'Enter a grade title (e.g. Midterm)'); return; }
     if (!selectedStudent) return;
 
+    const graded = rows.filter(r => r.name.trim() && (parseFloat(r.theory) > 0 || parseFloat(r.practical) > 0));
+    if (graded.length === 0) { Alert.alert('Error', 'Enter at least one subject with a score'); return; }
+
     setSaving(true);
     try {
-      const entries = subjects.map(sub => {
-        const sc = scores[sub.id];
-        const existing = allGrades.find(g => g.student_id === selectedStudent.id && g.subject_id === sub.id && g.term === term && g.title === title);
-        const theory = parseFloat(sc?.theory ?? (existing?.theory_score?.toString() ?? '0'));
-        const practical = parseFloat(sc?.practical ?? (existing?.practical_score?.toString() ?? '0'));
+      for (const row of graded) {
+        const theory = parseFloat(row.theory) || 0;
+        const practical = parseFloat(row.practical) || 0;
 
-        return {
+        const existing = savedGrades.find(
+          g => g.subject_name?.toLowerCase() === row.name.trim().toLowerCase() && g.term === term && g.title === title.trim()
+        );
+
+        const payload = {
           class_id: classId,
           student_id: selectedStudent.id,
-          subject_id: sub.id,
+          subject_name: row.name.trim(),
           title: title.trim(),
           theory_score: theory,
           practical_score: practical,
@@ -99,23 +131,17 @@ export default function TeacherGradesEntryScreen() {
           max_score: 100,
           term,
           entered_by: user?.id,
-          existingId: existing?.id ?? null,
         };
-      }).filter(e => e.theory_score > 0 || e.practical_score > 0);
 
-      if (entries.length === 0) { Alert.alert('Error', 'Enter at least one score'); return; }
-
-      for (const entry of entries) {
-        const { existingId, ...payload } = entry;
-        if (existingId) {
-          await supabase.from('grade_entries').update({ theory_score: payload.theory_score, practical_score: payload.practical_score, score: payload.score }).eq('id', existingId);
+        if (existing) {
+          await supabase.from('grade_entries').update({ theory_score: theory, practical_score: practical, score: theory + practical, subject_name: row.name.trim() }).eq('id', existing.id);
         } else {
           await supabase.from('grade_entries').insert(payload);
         }
       }
 
       Alert.alert('Success', `Saved grades for ${selectedStudent.full_name}`);
-      fetchData();
+      await loadStudentGrades(selectedStudent.id);
     } catch (err) {
       Alert.alert('Error', 'Failed to save grades');
     } finally {
@@ -123,42 +149,37 @@ export default function TeacherGradesEntryScreen() {
     }
   };
 
-  const computeOverallGpa = () => {
-    if (subjects.length === 0) return 0;
-    let totalPct = 0;
-    let count = 0;
-    for (const sub of subjects) {
-      const sc = scores[sub.id];
-      const existing = allGrades.find(g => g.student_id === selectedStudent?.id && g.subject_id === sub.id && g.term === term && g.title === title);
-      const theory = parseFloat(sc?.theory ?? (existing?.theory_score?.toString() ?? ''));
-      const practical = parseFloat(sc?.practical ?? (existing?.practical_score?.toString() ?? ''));
-      if (!isNaN(theory) || !isNaN(practical)) {
-        const total = (isNaN(theory) ? 0 : theory) + (isNaN(practical) ? 0 : practical);
-        totalPct += total;
-        count++;
-      }
-    }
-    return count > 0 ? totalPct / count / 10 : 0;
+  const loadFromSaved = () => {
+    if (savedGrades.length === 0) return;
+    const lastTitle = savedGrades[0].title;
+    const lastTerm = savedGrades[0].term;
+    setTitle(lastTitle);
+    setTerm(lastTerm);
+    const mapped: SubjectRow[] = savedGrades.map(g => ({
+      key: `saved_${g.id}`,
+      name: g.subject_name ?? '',
+      theory: g.theory_score?.toString() ?? '',
+      practical: g.practical_score?.toString() ?? '',
+    }));
+    setRows(mapped.length > 0 ? mapped : [newRow(), newRow(), newRow()]);
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
   if (!classInfo) return <View style={styles.center}><Text>Class not found</Text></View>;
 
-  // STEP 2: Selected student — show subjects with theory/practical
+  // STEP 2: Selected student — editable table
   if (selectedStudent) {
-    const overallGpa = computeOverallGpa();
-    const gpaColorFn = (g: number) => g >= 7 ? COLORS.success : g >= 5 ? COLORS.warning : COLORS.danger;
-    const gpaBgFn = (g: number) => g >= 7 ? COLORS.successBg : g >= 5 ? COLORS.warningBg : COLORS.dangerBg;
+    const overallGpa = getOverallGpa();
 
     return (
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => { setSelectedStudent(null); setScores({}); }} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => { setSelectedStudent(null); setRows([newRow(), newRow(), newRow()]); setSavedGrades([]); }} style={styles.backBtn}>
           <Text style={styles.backText}>← Back to students</Text>
         </TouchableOpacity>
 
         <View style={styles.studentHeader}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{selectedStudent.full_name[0]}</Text></View>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.studentName}>{selectedStudent.full_name}</Text>
             {selectedStudent.roll_number ? <Text style={styles.rollNo}>Roll #{selectedStudent.roll_number}</Text> : null}
           </View>
@@ -166,6 +187,7 @@ export default function TeacherGradesEntryScreen() {
 
         {isClassTeacher ? (
           <>
+            {/* Term + Title */}
             <View style={styles.formRow}>
               <View style={styles.formHalf}>
                 <Text style={styles.formLabel}>Term</Text>
@@ -177,58 +199,57 @@ export default function TeacherGradesEntryScreen() {
               </View>
             </View>
 
-            <Text style={styles.sectionLabel}>Subjects</Text>
-            {subjects.map(sub => {
-              const sc = scores[sub.id];
-              const existing = allGrades.find(g => g.student_id === selectedStudent.id && g.subject_id === sub.id && g.term === term && g.title === title);
-              const theory = sc?.theory ?? existing?.theory_score?.toString() ?? '';
-              const practical = sc?.practical ?? existing?.practical_score?.toString() ?? '';
-              const t = parseFloat(theory || '0');
-              const p = parseFloat(practical || '0');
-              const total = t + p;
-              const pct = Math.round((total / 100) * 100);
-              const subGpa = total / 10;
+            {savedGrades.length > 0 && (
+              <TouchableOpacity style={styles.loadBtn} onPress={loadFromSaved}>
+                <Text style={styles.loadBtnText}>Load previous grades for this term</Text>
+              </TouchableOpacity>
+            )}
 
-              return (
-                <View key={sub.id} style={styles.subjectCard}>
-                  <View style={styles.subjectHeader}>
-                    <Text style={styles.subjectName}>{sub.name}</Text>
-                    <View style={[styles.gpaPill, { backgroundColor: gpaBgFn(subGpa) }]}>
-                      <Text style={[styles.gpaPillText, { color: gpaColorFn(subGpa) }]}>{subGpa.toFixed(1)} GPA · {pct}%</Text>
+            {/* Table */}
+            <View style={styles.table}>
+              <View style={[styles.tableRow, styles.tableHeader]}>
+                <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Subject</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Theory /75</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Practical /25</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Total</Text>
+                <View style={{ width: 28 }} />
+              </View>
+
+              {rows.map((row) => {
+                const total = getRowTotal(row);
+                const gpa = getRowGpa(row);
+                return (
+                  <View key={row.key} style={styles.tableRow}>
+                    <TextInput style={[styles.tableCell, { flex: 2 }]} value={row.name} onChangeText={v => updateRow(row.key, 'name', v)} placeholder="e.g. Math" placeholderTextColor={COLORS.textTertiary} />
+                    <TextInput style={[styles.tableCell, { flex: 1.2 }]} keyboardType="numeric" value={row.theory} onChangeText={v => updateRow(row.key, 'theory', v)} placeholder="0" placeholderTextColor={COLORS.textTertiary} />
+                    <TextInput style={[styles.tableCell, { flex: 1.2 }]} keyboardType="numeric" value={row.practical} onChangeText={v => updateRow(row.key, 'practical', v)} placeholder="0" placeholderTextColor={COLORS.textTertiary} />
+                    <View style={[styles.tableCell, { flex: 0.8, justifyContent: 'center' }]}>
+                      <Text style={[styles.totalText, total > 0 && { color: gpaColor(gpa) }]}>{total}</Text>
                     </View>
+                    <TouchableOpacity style={styles.removeBtn} onPress={() => removeRow(row.key)}>
+                      <Text style={styles.removeBtnText}>×</Text>
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.scoreRow}>
-                    <View style={styles.scoreInput}>
-                      <Text style={styles.scoreLabel}>Theory /75</Text>
-                      <TextInput style={styles.scoreField} keyboardType="numeric" value={theory} onChangeText={v => handleScoreChange(sub.id, 'theory', v)} placeholder="0" />
-                    </View>
-                    <Text style={styles.scorePlus}>+</Text>
-                    <View style={styles.scoreInput}>
-                      <Text style={styles.scoreLabel}>Practical /25</Text>
-                      <TextInput style={styles.scoreField} keyboardType="numeric" value={practical} onChangeText={v => handleScoreChange(sub.id, 'practical', v)} placeholder="0" />
-                    </View>
-                    <View style={styles.scoreTotal}>
-                      <Text style={styles.scoreEquals}>=</Text>
-                      <Text style={[styles.scoreTotalVal, { color: gpaColorFn(subGpa) }]}>{total}</Text>
-                      <Text style={styles.scoreLabel}>/100</Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
+
+            <TouchableOpacity style={styles.addRowBtn} onPress={addRow}>
+              <Text style={styles.addRowBtnText}>+ Add Subject</Text>
+            </TouchableOpacity>
 
             {/* Overall GPA */}
-            <View style={styles.overallCard}>
-              <Text style={styles.overallLabel}>Overall GPA</Text>
-              <Text style={[styles.overallGpa, { color: gpaColorFn(overallGpa) }]}>{overallGpa.toFixed(1)}</Text>
-              <Text style={styles.overallSub}>/ 10</Text>
-              <View style={styles.overallBar}>
-                <View style={[styles.overallBarFill, { width: `${Math.min(overallGpa * 10, 100)}%`, backgroundColor: gpaColorFn(overallGpa) }]} />
+            <View style={styles.gpaCard}>
+              <Text style={styles.gpaLabel}>Overall GPA</Text>
+              <Text style={[styles.gpaValue, { color: gpaColor(overallGpa) }]}>{overallGpa.toFixed(1)}</Text>
+              <Text style={styles.gpaSub}>/ 10</Text>
+              <View style={styles.gpaBar}>
+                <View style={[styles.gpaBarFill, { width: `${Math.min(overallGpa * 10, 100)}%`, backgroundColor: gpaColor(overallGpa) }]} />
               </View>
             </View>
 
             <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-              <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save All Grades'}</Text>
+              <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Grades'}</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -250,33 +271,26 @@ export default function TeacherGradesEntryScreen() {
       <Text style={styles.className}>{classInfo.name}</Text>
       <Text style={styles.gradeLevel}>Grade {classInfo.grade_level}</Text>
 
+      {!isClassTeacher && (
+        <View style={[styles.badge, { backgroundColor: COLORS.warningBg, marginBottom: 16 }]}>
+          <Text style={[styles.badgeText, { color: COLORS.warning }]}>View Only</Text>
+        </View>
+      )}
+
       <Text style={styles.sectionLabel}>Select a student to grade</Text>
 
-      {students.map(s => {
-        const studentGrades = getStudentGrades(s.id);
-        const gradedCount = studentGrades.filter(g => (g.theory_score ?? 0) > 0 || (g.practical_score ?? 0) > 0).length;
-        return (
-          <TouchableOpacity key={s.id} style={styles.studentCard} onPress={() => setSelectedStudent(s)}>
-            <View style={styles.studentRow}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{s.full_name[0]}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.studentName}>{s.full_name}</Text>
-                {s.roll_number ? <Text style={styles.rollNo}>Roll #{s.roll_number}</Text> : null}
-              </View>
-              {gradedCount > 0 ? (
-                <View style={[styles.gradedBadge, { backgroundColor: COLORS.successBg }]}>
-                  <Text style={[styles.gradedBadgeText, { color: COLORS.success }]}>{gradedCount}/{subjects.length}</Text>
-                </View>
-              ) : (
-                <View style={[styles.gradedBadge, { backgroundColor: COLORS.surfaceAlt }]}>
-                  <Text style={[styles.gradedBadgeText, { color: COLORS.textSecondary }]}>0/{subjects.length}</Text>
-                </View>
-              )}
-              <Text style={styles.arrow}>›</Text>
+      {students.map(s => (
+        <TouchableOpacity key={s.id} style={styles.studentCard} onPress={() => handleSelectStudent(s)}>
+          <View style={styles.studentRow}>
+            <View style={styles.avatar}><Text style={styles.avatarText}>{s.full_name[0]}</Text></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.studentName}>{s.full_name}</Text>
+              {s.roll_number ? <Text style={styles.rollNo}>Roll #{s.roll_number}</Text> : null}
             </View>
-          </TouchableOpacity>
-        );
-      })}
+            <Text style={styles.arrow}>›</Text>
+          </View>
+        </TouchableOpacity>
+      ))}
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -292,47 +306,49 @@ const styles = StyleSheet.create({
   gradeLevel: { fontSize: 15, color: COLORS.textSecondary, marginTop: 4, marginBottom: 20 },
   sectionLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
 
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  badgeText: { fontSize: 13, fontWeight: '600' },
+
+  // Student list
   studentCard: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 14, marginBottom: 10, ...SHADOWS.sm },
   studentRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   avatarText: { fontSize: 16, fontWeight: '700', color: COLORS.primary },
   studentName: { fontSize: 15, fontWeight: '600', color: COLORS.text },
   rollNo: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  gradedBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginRight: 8 },
-  gradedBadgeText: { fontSize: 12, fontWeight: '700' },
   arrow: { fontSize: 22, color: COLORS.textSecondary, fontWeight: '300' },
 
-  // Student detail view
+  // Student detail
   studentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  formRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  formRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   formHalf: { flex: 1 },
   formLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 6 },
   input: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, padding: 12, fontSize: 15, color: COLORS.text },
 
-  subjectCard: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 14, marginBottom: 10, ...SHADOWS.sm },
-  subjectHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  subjectName: { fontSize: 15, fontWeight: '700', color: COLORS.text },
-  gpaPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  gpaPillText: { fontSize: 12, fontWeight: '700' },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  scoreInput: { flex: 1 },
-  scoreLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 4 },
-  scoreField: { backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 10, fontSize: 15, color: COLORS.text, textAlign: 'center' },
-  scorePlus: { fontSize: 18, fontWeight: '700', color: COLORS.textSecondary, marginTop: 16 },
-  scoreTotal: { alignItems: 'center', marginTop: 16 },
-  scoreEquals: { fontSize: 16, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 4 },
-  scoreTotalVal: { fontSize: 18, fontWeight: '800' },
+  loadBtn: { backgroundColor: COLORS.surfaceAlt, padding: 12, borderRadius: 10, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
+  loadBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
 
-  overallCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, marginTop: 12, marginBottom: 8, alignItems: 'center', ...SHADOWS.md },
-  overallLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
-  overallGpa: { fontSize: 52, fontWeight: '800', marginTop: 4 },
-  overallSub: { fontSize: 15, color: COLORS.textSecondary, marginTop: 2 },
-  overallBar: { width: '100%', height: 6, backgroundColor: COLORS.surfaceAlt, borderRadius: 3, marginTop: 16 },
-  overallBarFill: { height: 6, borderRadius: 3 },
+  // Table
+  table: { backgroundColor: COLORS.surface, borderRadius: 14, overflow: 'hidden', marginBottom: 10, ...SHADOWS.sm },
+  tableRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: COLORS.border, minHeight: 48 },
+  tableHeader: { backgroundColor: COLORS.surfaceAlt, minHeight: 40 },
+  tableHeaderCell: { fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 10, paddingVertical: 10 },
+  tableCell: { fontSize: 14, color: COLORS.text, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 0 },
+  totalText: { fontSize: 14, fontWeight: '700', color: COLORS.textSecondary },
+  removeBtn: { width: 28, justifyContent: 'center', alignItems: 'center', paddingVertical: 10 },
+  removeBtnText: { fontSize: 20, color: COLORS.danger, fontWeight: '400' },
 
-  saveBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
+  addRowBtn: { padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.primary, borderStyle: 'dashed', alignItems: 'center', marginBottom: 16 },
+  addRowBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
+
+  // GPA
+  gpaCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, marginBottom: 12, alignItems: 'center', ...SHADOWS.md },
+  gpaLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
+  gpaValue: { fontSize: 52, fontWeight: '800', marginTop: 4 },
+  gpaSub: { fontSize: 15, color: COLORS.textSecondary, marginTop: 2 },
+  gpaBar: { width: '100%', height: 6, backgroundColor: COLORS.surfaceAlt, borderRadius: 3, marginTop: 16 },
+  gpaBarFill: { height: 6, borderRadius: 3 },
+
+  saveBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 8 },
   saveBtnText: { color: COLORS.textInverse, fontSize: 16, fontWeight: '700' },
-
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, marginBottom: 20 },
-  badgeText: { fontSize: 13, fontWeight: '600' },
 });
