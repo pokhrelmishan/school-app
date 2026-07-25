@@ -25,11 +25,14 @@ BEGIN
   IF v_class2_id IS NULL THEN v_class2_id := v_class1_id; END IF;
   IF v_teacher2_id IS NULL THEN v_teacher2_id := v_teacher1_id; END IF;
 
-  -- Subjects
+  -- Subjects (6 placeholder)
   INSERT INTO subjects (id, name, school_id) VALUES
     (gen_random_uuid(), 'Mathematics', v_school_id),
     (gen_random_uuid(), 'English', v_school_id),
-    (gen_random_uuid(), 'Science', v_school_id)
+    (gen_random_uuid(), 'Science', v_school_id),
+    (gen_random_uuid(), 'Social Studies', v_school_id),
+    (gen_random_uuid(), 'Nepali', v_school_id),
+    (gen_random_uuid(), 'Computer Science', v_school_id)
   ON CONFLICT DO NOTHING;
 
   SELECT id INTO v_math_id FROM subjects WHERE school_id = v_school_id AND name = 'Mathematics' LIMIT 1;

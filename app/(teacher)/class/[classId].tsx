@@ -7,6 +7,9 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +25,12 @@ interface Student {
 interface SubjectAssignment {
   id: string;
   subject_name: string;
+  subject_id: string;
+}
+
+interface Subject {
+  id: string;
+  name: string;
 }
 
 interface ClassInfo {
@@ -39,7 +48,11 @@ export default function ClassDetailScreen() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isClassTeacher, setIsClassTeacher] = useState(false);
   const [subjects, setSubjects] = useState<SubjectAssignment[]>([]);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddSubject, setShowAddSubject] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [addingSubject, setAddingSubject] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,14 +112,86 @@ export default function ClassDetailScreen() {
           subjectRes.data.map((s: any) => ({
             id: s.id,
             subject_name: s.subjects?.name ?? '',
+            subject_id: s.subject_id,
           }))
         );
+      }
+
+      // Fetch all available subjects for this school
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const profileRes = await supabase.from('profiles').select('school_id').eq('id', currentUser.id).single();
+        if (profileRes.data?.school_id) {
+          const allSubRes = await supabase.from('subjects').select('id, name').eq('school_id', profileRes.data.school_id);
+          if (allSubRes.data) setAllSubjects(allSubRes.data as Subject[]);
+        }
       }
     } catch (err) {
       console.error('Error fetching class data:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddSubject = async () => {
+    const name = newSubjectName.trim();
+    if (!name) { Alert.alert('Error', 'Enter a subject name'); return; }
+    if (!classId) return;
+
+    setAddingSubject(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const profileRes = await supabase.from('profiles').select('school_id').eq('id', user.id).single();
+      const schoolId = profileRes.data?.school_id;
+      if (!schoolId) return;
+
+      // Check if subject already exists
+      let subId: string | null = null;
+      const existing = allSubjects.find(s => s.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        subId = existing.id;
+      } else {
+        // Create new subject
+        const { data: newSub, error: subErr } = await supabase.from('subjects').insert({ name, school_id: schoolId }).select('id').single();
+        if (subErr) { Alert.alert('Error', subErr.message); return; }
+        subId = newSub?.id ?? null;
+      }
+
+      if (!subId) return;
+
+      // Check if already assigned
+      const alreadyAssigned = subjects.some(s => s.subject_id === subId);
+      if (alreadyAssigned) { Alert.alert('Info', 'Subject already added to this class'); return; }
+
+      // Link teacher to subject + class
+      const { error: linkErr } = await supabase.from('teacher_subjects').insert({
+        teacher_id: user.id,
+        subject_id: subId,
+        class_id: classId,
+        school_id: schoolId,
+      });
+      if (linkErr) { Alert.alert('Error', linkErr.message); return; }
+
+      setNewSubjectName('');
+      setShowAddSubject(false);
+      fetchData();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to add subject');
+    } finally {
+      setAddingSubject(false);
+    }
+  };
+
+  const handleRemoveSubject = (subjectAssignmentId: string) => {
+    Alert.alert('Remove Subject', 'Remove this subject from the class?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        await supabase.from('teacher_subjects').delete().eq('id', subjectAssignmentId);
+        fetchData();
+      }},
+    ]);
   };
 
   const handleMarkAttendance = () => {
@@ -211,7 +296,48 @@ export default function ClassDetailScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Subjects Section */}
             <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Subjects</Text>
+              <TouchableOpacity onPress={() => setShowAddSubject(!showAddSubject)}>
+                <Text style={styles.addSubjectBtn}>{showAddSubject ? 'Cancel' : '+ Add'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showAddSubject && (
+              <View style={styles.addSubjectCard}>
+                <TextInput
+                  style={styles.addSubjectInput}
+                  value={newSubjectName}
+                  onChangeText={setNewSubjectName}
+                  placeholder="Subject name (e.g. Nepali)"
+                  placeholderTextColor={COLORS.textSecondary}
+                />
+                <TouchableOpacity
+                  style={[styles.addSubjectSaveBtn, addingSubject && { opacity: 0.6 }]}
+                  onPress={handleAddSubject}
+                  disabled={addingSubject}
+                >
+                  <Text style={styles.addSubjectSaveBtnText}>{addingSubject ? 'Adding...' : 'Add'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {subjects.length > 0 ? subjects.map(sub => (
+              <View key={sub.id} style={styles.subjectRow}>
+                <View style={[styles.subjectDot, { backgroundColor: COLORS.primary }]} />
+                <Text style={styles.subjectName}>{sub.subject_name}</Text>
+                {isClassTeacher && (
+                  <TouchableOpacity onPress={() => handleRemoveSubject(sub.id)}>
+                    <Text style={styles.removeSubjectBtn}>×</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )) : (
+              <Text style={styles.emptySubjectsText}>No subjects yet. Add one to start grading.</Text>
+            )}
+
+            <View style={[styles.sectionHeader, { marginTop: 20 }]}>
               <Text style={styles.sectionTitle}>Enrolled Students</Text>
               <Text style={styles.studentCount}>{students.length}</Text>
             </View>
@@ -357,6 +483,74 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary || '#888',
     marginTop: 12,
+  },
+  addSubjectBtn: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  addSubjectCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
+    ...SHADOWS.sm,
+  },
+  addSubjectInput: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceAlt || '#f5f5f5',
+    borderWidth: 1,
+    borderColor: COLORS.border || '#e5e5e5',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: COLORS.text || '#1a1a2e',
+  },
+  addSubjectSaveBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  addSubjectSaveBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  subjectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 6,
+    ...SHADOWS.sm,
+  },
+  subjectDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  subjectName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.text || '#1a1a2e',
+  },
+  removeSubjectBtn: {
+    fontSize: 22,
+    color: COLORS.danger || '#ef4444',
+    fontWeight: '400',
+    paddingHorizontal: 8,
+  },
+  emptySubjectsText: {
+    fontSize: 13,
+    color: COLORS.textSecondary || '#888',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   errorText: {
     fontSize: 16,
