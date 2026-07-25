@@ -6,7 +6,6 @@ import { useAuth } from '../../lib/auth';
 
 interface GradeEntry {
   id: string;
-  title: string;
   subject_name: string | null;
   grade_letter: string | null;
   practical_grade: string | null;
@@ -29,7 +28,7 @@ export default function StudentGradesScreen() {
     if (!isRefresh) setLoading(true);
     let q = supabase
       .from('grade_entries')
-      .select('id, title, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term, created_at, class:classes(name, grade_level)')
+      .select('id, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term, created_at, class:classes(name, grade_level)')
       .eq('student_id', user.id)
       .order('created_at', { ascending: false });
     if (selectedTerm) q = q.eq('term', selectedTerm);
@@ -105,7 +104,7 @@ export default function StudentGradesScreen() {
                 <View style={styles.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{item.subject_name ?? 'Subject'}</Text>
-                    <Text style={styles.cardMeta}>{item.title} · {className} · {item.term}</Text>
+                    <Text style={styles.cardMeta}>{className} · {item.term}</Text>
                   </View>
                   {item.subject_gpa != null && (
                     <Text style={[styles.gpaBadge, { color: gpaColor(item.subject_gpa) }]}>{Number(item.subject_gpa).toFixed(1)} GPA</Text>

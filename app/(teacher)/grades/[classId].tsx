@@ -7,7 +7,7 @@ import { useAuth } from '../../../lib/auth';
 
 interface ClassInfo { id: string; name: string; grade_level: string; teacher_id: string; }
 interface Student { id: string; full_name: string; email: string; roll_number?: string; }
-interface SavedGrade { id: string; student_id: string; title: string; subject_name: string; grade_letter: string | null; practical_grade: string | null; subject_gpa: number | null; overall_gpa: number | null; term: string; }
+interface SavedGrade { id: string; student_id: string; subject_name: string; grade_letter: string | null; practical_grade: string | null; subject_gpa: number | null; overall_gpa: number | null; term: string; }
 interface SubjectRow { key: string; name: string; theory: string; practical: string; gpa: string; }
 
 let rowCounter = 0;
@@ -25,7 +25,6 @@ export default function TeacherGradesEntryScreen() {
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [term, setTerm] = useState('Term 1');
-  const [title, setTitle] = useState('');
   const [rows, setRows] = useState<SubjectRow[]>([newRow(), newRow(), newRow()]);
   const [overallGpa, setOverallGpa] = useState('');
   const [savedGrades, setSavedGrades] = useState<SavedGrade[]>([]);
@@ -59,7 +58,7 @@ export default function TeacherGradesEntryScreen() {
   const loadStudentGrades = async (studentId: string) => {
     const { data } = await supabase
       .from('grade_entries')
-      .select('id, student_id, title, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term')
+      .select('id, student_id, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term')
       .eq('class_id', classId)
       .eq('student_id', studentId);
     if (data) {
@@ -71,7 +70,6 @@ export default function TeacherGradesEntryScreen() {
     setSelectedStudent(student);
     setRows([newRow(), newRow(), newRow()]);
     setTerm('Term 1');
-    setTitle('');
     setOverallGpa('');
     await loadStudentGrades(student.id);
   };
@@ -89,7 +87,6 @@ export default function TeacherGradesEntryScreen() {
 
   const loadFromSaved = () => {
     if (savedGrades.length === 0) return;
-    setTitle(savedGrades[0].title);
     setTerm(savedGrades[0].term);
     setOverallGpa(savedGrades[0].overall_gpa?.toString() ?? '');
     const mapped: SubjectRow[] = savedGrades.map(g => ({
@@ -103,7 +100,6 @@ export default function TeacherGradesEntryScreen() {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) { Alert.alert('Error', 'Enter a grade title (e.g. Midterm)'); return; }
     if (!selectedStudent) return;
 
     const graded = rows.filter(r => r.name.trim());
@@ -113,14 +109,13 @@ export default function TeacherGradesEntryScreen() {
     try {
       for (const row of graded) {
         const existing = savedGrades.find(
-          g => g.subject_name?.toLowerCase() === row.name.trim().toLowerCase() && g.term === term && g.title === title.trim()
+          g => g.subject_name?.toLowerCase() === row.name.trim().toLowerCase() && g.term === term
         );
 
         const payload = {
           class_id: classId,
           student_id: selectedStudent.id,
           subject_name: row.name.trim(),
-          title: title.trim(),
           grade_letter: row.theory.trim() || null,
           practical_grade: row.practical.trim() || null,
           subject_gpa: parseFloat(row.gpa) || null,
@@ -177,11 +172,7 @@ export default function TeacherGradesEntryScreen() {
             <View style={styles.formRow}>
               <View style={styles.formHalf}>
                 <Text style={styles.formLabel}>Term</Text>
-                <TextInput style={styles.input} value={term} onChangeText={setTerm} placeholder="Term 1" />
-              </View>
-              <View style={styles.formHalf}>
-                <Text style={styles.formLabel}>Title</Text>
-                <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Midterm" />
+                <TextInput style={styles.input} value={term} onChangeText={setTerm} placeholder="e.g. Midterm, Term 1, Final" />
               </View>
             </View>
 
