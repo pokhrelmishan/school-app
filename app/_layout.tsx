@@ -23,7 +23,7 @@ function AuthGate() {
         admin: '/(admin)/dashboard',
         teacher: '/(teacher)/classes',
         parent: '/(parent)/attendance',
-        student: '/(student)/attendance',
+        student: '/(student)/dashboard',
       };
       const target = routes[profile.role];
       if (target) router.replace(target as any);
