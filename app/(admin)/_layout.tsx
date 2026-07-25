@@ -46,13 +46,6 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
-        name="grades"
-        options={{
-          title: 'Grades',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
@@ -61,12 +54,6 @@ export default function AdminLayout() {
       />
       <Tabs.Screen
         name="class/[classId]"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="grades/[classId]"
         options={{
           href: null,
         }}

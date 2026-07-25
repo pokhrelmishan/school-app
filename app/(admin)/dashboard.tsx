@@ -164,10 +164,10 @@ export default function AdminDashboard() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionCard, SHADOWS.sm]}
-          onPress={() => router.push('/(admin)/grades' as any)}
+          onPress={() => router.push('/(admin)/subjects' as any)}
         >
-          <Text style={styles.actionEmoji}>📊</Text>
-          <Text style={styles.actionLabel}>Enter Grades</Text>
+          <Text style={styles.actionEmoji}>📖</Text>
+          <Text style={styles.actionLabel}>Subjects</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
