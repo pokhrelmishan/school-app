@@ -11,13 +11,8 @@ function TabIcon({ icon, focused }: { icon: string; focused: boolean }) {
 }
 
 const tabStyles = StyleSheet.create({
-  icon: {
-    fontSize: 22,
-    opacity: 0.4,
-  },
-  iconActive: {
-    opacity: 1,
-  },
+  icon: { fontSize: 22, opacity: 0.4 },
+  iconActive: { opacity: 1 },
 });
 
 export default function StudentLayout() {
@@ -35,11 +30,7 @@ export default function StudentLayout() {
           paddingBottom: 10,
           paddingTop: 8,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
-        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
       }}
     >
       <Tabs.Screen
@@ -50,10 +41,10 @@ export default function StudentLayout() {
         }}
       />
       <Tabs.Screen
-        name="attendance"
+        name="timetable"
         options={{
-          title: 'Attendance',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} />,
+          title: 'Schedule',
+          tabBarIcon: ({ focused }) => <TabIcon icon="🗓️" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -64,13 +55,6 @@ export default function StudentLayout() {
         }}
       />
       <Tabs.Screen
-        name="assignments"
-        options={{
-          title: 'Tasks',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📝" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
         name="messages"
         options={{
           title: 'Messages',
@@ -78,19 +62,19 @@ export default function StudentLayout() {
         }}
       />
       <Tabs.Screen
-        name="notices"
+        name="exams"
         options={{
-          title: 'Notices',
-          href: null,
+          title: 'Exams',
+          tabBarIcon: ({ focused }) => <TabIcon icon="📝" focused={focused} />,
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          href: null,
-        }}
-      />
+      {/* Hidden screens */}
+      <Tabs.Screen name="attendance" options={{ href: null }} />
+      <Tabs.Screen name="assignments" options={{ href: null }} />
+      <Tabs.Screen name="fees" options={{ href: null }} />
+      <Tabs.Screen name="events" options={{ href: null }} />
+      <Tabs.Screen name="notices" options={{ href: null }} />
+      <Tabs.Screen name="profile" options={{ href: null }} />
     </Tabs>
   );
 }

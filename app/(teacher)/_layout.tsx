@@ -42,17 +42,20 @@ export default function TeacherLayout() {
         options={{ title: 'Classes', tabBarIcon: ({ focused }) => <TabIcon icon="📚" focused={focused} /> }}
       />
       <Tabs.Screen
-        name="attendance"
-        options={{ title: 'Attendance', tabBarIcon: ({ focused }) => <TabIcon icon="✓" focused={focused} /> }}
+        name="timetable"
+        options={{ title: 'Schedule', tabBarIcon: ({ focused }) => <TabIcon icon="🗓️" focused={focused} /> }}
       />
       <Tabs.Screen
         name="messages"
         options={{ title: 'Messages', tabBarIcon: ({ focused }) => <TabIcon icon="💬" focused={focused} /> }}
       />
       <Tabs.Screen
-        name="calendar"
-        options={{ title: 'Calendar', tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} /> }}
+        name="exams"
+        options={{ title: 'Exams', tabBarIcon: ({ focused }) => <TabIcon icon="📝" focused={focused} /> }}
       />
+      {/* Hidden screens */}
+      <Tabs.Screen name="attendance" options={{ href: null }} />
+      <Tabs.Screen name="calendar" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ href: null }} />
       <Tabs.Screen name="class/[classId]" options={{ href: null }} />
       <Tabs.Screen name="attendance/[classId]" options={{ href: null }} />
