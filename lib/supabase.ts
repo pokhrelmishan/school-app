@@ -2,7 +2,14 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import ws from 'ws';
+
+let wsTransport: any = undefined;
+if (Platform.OS === 'web') {
+  try {
+    const ws = require('ws');
+    wsTransport = ws.default || ws;
+  } catch {}
+}
 
 const ExpoSecureStoreAdapter = {
   getItem: (key: string) => {
@@ -45,6 +52,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
   realtime: {
-    transport: ws as any,
+    ...(wsTransport ? { transport: wsTransport } : {}),
   },
 });
