@@ -14,10 +14,11 @@ function AuthGate() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inRoleGroup = ['(admin)', '(teacher)', '(student)', '(parent)'].includes(segments[0] as string);
 
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (user && profile?.role && inAuthGroup) {
+    } else if (user && profile?.role && !inAuthGroup && !inRoleGroup) {
       const routes: Record<string, string> = {
         admin: '/(admin)/dashboard',
         teacher: '/(teacher)/classes',

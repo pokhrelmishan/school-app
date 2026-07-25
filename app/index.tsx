@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../lib/theme';
@@ -7,13 +7,6 @@ import { supabase } from '../lib/supabase';
 
 const roles = ['admin', 'teacher', 'student', 'parent'] as const;
 
-const roleRoutes: Record<string, string> = {
-  admin: '/(admin)/dashboard',
-  teacher: '/(teacher)/classes',
-  parent: '/(parent)/attendance',
-  student: '/(student)/attendance',
-};
-
 export default function Dashboard() {
   const { user, loading, profile, logout } = useAuth();
   const router = useRouter();
@@ -21,12 +14,6 @@ export default function Dashboard() {
   const [schoolName, setSchoolName] = useState('Elmwood Academy');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!loading && user && profile?.role && roleRoutes[profile.role]) {
-      router.replace(roleRoutes[profile.role] as any);
-    }
-  }, [user, loading, profile]);
 
   if (loading) {
     return (
