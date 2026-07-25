@@ -137,22 +137,24 @@ export default function TeacherGradesEntryScreen() {
         };
 
         if (existing) {
-          await supabase.from('grade_entries').update({
+          const { error } = await supabase.from('grade_entries').update({
             grade_letter: payload.grade_letter,
             practical_grade: payload.practical_grade,
             subject_gpa: payload.subject_gpa,
             overall_gpa: payload.overall_gpa,
             subject_name: payload.subject_name,
           }).eq('id', existing.id);
+          if (error) { Alert.alert('Update Error', error.message); return; }
         } else {
-          await supabase.from('grade_entries').insert(payload);
+          const { error } = await supabase.from('grade_entries').insert(payload);
+          if (error) { Alert.alert('Insert Error', error.message); return; }
         }
       }
 
       Alert.alert('Success', `Saved grades for ${selectedStudent.full_name}`);
       await loadStudentGrades(selectedStudent.id);
     } catch (err) {
-      Alert.alert('Error', 'Failed to save grades');
+      Alert.alert('Error', `Failed to save: ${err}`);
     } finally {
       setSaving(false);
     }
