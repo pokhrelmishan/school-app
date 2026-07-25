@@ -7,11 +7,11 @@ import { useAuth } from '../../../lib/auth';
 
 interface ClassInfo { id: string; name: string; grade_level: string; teacher_id: string; }
 interface Student { id: string; full_name: string; email: string; roll_number?: string; }
-interface SavedGrade { id: string; student_id: string; title: string; subject_name: string; grade_letter: string | null; subject_gpa: number | null; overall_gpa: number | null; term: string; }
-interface SubjectRow { key: string; name: string; grade: string; gpa: string; }
+interface SavedGrade { id: string; student_id: string; title: string; subject_name: string; grade_letter: string | null; practical_grade: string | null; subject_gpa: number | null; overall_gpa: number | null; term: string; }
+interface SubjectRow { key: string; name: string; theory: string; practical: string; gpa: string; }
 
 let rowCounter = 0;
-const newRow = (name = '', grade = '', gpa = ''): SubjectRow => ({ key: `row_${Date.now()}_${rowCounter++}`, name, grade, gpa });
+const newRow = (name = '', theory = '', practical = '', gpa = ''): SubjectRow => ({ key: `row_${Date.now()}_${rowCounter++}`, name, theory, practical, gpa });
 
 export default function TeacherGradesEntryScreen() {
   const { classId } = useLocalSearchParams<{ classId: string }>();
@@ -59,7 +59,7 @@ export default function TeacherGradesEntryScreen() {
   const loadStudentGrades = async (studentId: string) => {
     const { data } = await supabase
       .from('grade_entries')
-      .select('id, student_id, title, subject_name, grade_letter, subject_gpa, overall_gpa, term')
+      .select('id, student_id, title, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term')
       .eq('class_id', classId)
       .eq('student_id', studentId);
     if (data) {
@@ -76,7 +76,7 @@ export default function TeacherGradesEntryScreen() {
     await loadStudentGrades(student.id);
   };
 
-  const updateRow = (key: string, field: 'name' | 'grade' | 'gpa', value: string) => {
+  const updateRow = (key: string, field: 'name' | 'theory' | 'practical' | 'gpa', value: string) => {
     setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value } : r));
   };
 
@@ -95,7 +95,8 @@ export default function TeacherGradesEntryScreen() {
     const mapped: SubjectRow[] = savedGrades.map(g => ({
       key: `saved_${g.id}`,
       name: g.subject_name ?? '',
-      grade: g.grade_letter ?? '',
+      theory: g.grade_letter ?? '',
+      practical: g.practical_grade ?? '',
       gpa: g.subject_gpa?.toString() ?? '',
     }));
     setRows(mapped.length > 0 ? mapped : [newRow(), newRow(), newRow()]);
@@ -120,7 +121,8 @@ export default function TeacherGradesEntryScreen() {
           student_id: selectedStudent.id,
           subject_name: row.name.trim(),
           title: title.trim(),
-          grade_letter: row.grade.trim() || null,
+          grade_letter: row.theory.trim() || null,
+          practical_grade: row.practical.trim() || null,
           subject_gpa: parseFloat(row.gpa) || null,
           overall_gpa: parseFloat(overallGpa) || null,
           term,
@@ -132,6 +134,7 @@ export default function TeacherGradesEntryScreen() {
         if (existing) {
           await supabase.from('grade_entries').update({
             grade_letter: payload.grade_letter,
+            practical_grade: payload.practical_grade,
             subject_gpa: payload.subject_gpa,
             overall_gpa: payload.overall_gpa,
             subject_name: payload.subject_name,
@@ -191,17 +194,19 @@ export default function TeacherGradesEntryScreen() {
             {/* Table */}
             <View style={styles.table}>
               <View style={[styles.tableRow, styles.tableHeader]}>
-                <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Subject</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Grade</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>GPA</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Subject</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Theory</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Practical</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>GPA</Text>
                 <View style={{ width: 32 }} />
               </View>
 
               {rows.map((row) => (
                 <View key={row.key} style={styles.tableRow}>
-                  <TextInput style={[styles.tableCell, { flex: 2.5 }]} value={row.name} onChangeText={v => updateRow(row.key, 'name', v)} placeholder="e.g. Math" placeholderTextColor={COLORS.textTertiary} />
-                  <TextInput style={[styles.tableCell, { flex: 1.5 }]} value={row.grade} onChangeText={v => updateRow(row.key, 'grade', v)} placeholder="A+" placeholderTextColor={COLORS.textTertiary} />
-                  <TextInput style={[styles.tableCell, { flex: 1.5 }]} keyboardType="numeric" value={row.gpa} onChangeText={v => updateRow(row.key, 'gpa', v)} placeholder="4.0" placeholderTextColor={COLORS.textTertiary} />
+                  <TextInput style={[styles.tableCell, { flex: 2 }]} value={row.name} onChangeText={v => updateRow(row.key, 'name', v)} placeholder="e.g. Math" placeholderTextColor={COLORS.textTertiary} />
+                  <TextInput style={[styles.tableCell, { flex: 1.3 }]} value={row.theory} onChangeText={v => updateRow(row.key, 'theory', v)} placeholder="A+" placeholderTextColor={COLORS.textTertiary} />
+                  <TextInput style={[styles.tableCell, { flex: 1.3 }]} value={row.practical} onChangeText={v => updateRow(row.key, 'practical', v)} placeholder="A" placeholderTextColor={COLORS.textTertiary} />
+                  <TextInput style={[styles.tableCell, { flex: 1.2 }]} keyboardType="numeric" value={row.gpa} onChangeText={v => updateRow(row.key, 'gpa', v)} placeholder="4.0" placeholderTextColor={COLORS.textTertiary} />
                   <TouchableOpacity style={styles.removeBtn} onPress={() => removeRow(row.key)}>
                     <Text style={styles.removeBtnText}>×</Text>
                   </TouchableOpacity>

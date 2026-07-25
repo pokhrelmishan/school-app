@@ -1,9 +1,10 @@
 -- Migration 000013: Grading system
--- Letter grades (A+, A, B+, etc.) + GPA per subject, overall GPA
+-- Theory grade, Practical grade, Subject GPA per subject, Overall GPA
 
--- Add new columns to grade_entries
+-- Add columns to grade_entries
 ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS subject_name TEXT;
-ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS grade_letter TEXT;
+ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS grade_letter TEXT;       -- theory grade
+ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS practical_grade TEXT;    -- practical grade
 ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS subject_gpa NUMERIC;
 ALTER TABLE grade_entries ADD COLUMN IF NOT EXISTS overall_gpa NUMERIC;
 

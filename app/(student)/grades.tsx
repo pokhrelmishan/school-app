@@ -9,6 +9,7 @@ interface GradeEntry {
   title: string;
   subject_name: string | null;
   grade_letter: string | null;
+  practical_grade: string | null;
   subject_gpa: number | null;
   overall_gpa: number | null;
   term: string;
@@ -28,7 +29,7 @@ export default function StudentGradesScreen() {
     if (!isRefresh) setLoading(true);
     let q = supabase
       .from('grade_entries')
-      .select('id, title, subject_name, grade_letter, subject_gpa, overall_gpa, term, created_at, class:classes(name, grade_level)')
+      .select('id, title, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term, created_at, class:classes(name, grade_level)')
       .eq('student_id', user.id)
       .order('created_at', { ascending: false });
     if (selectedTerm) q = q.eq('term', selectedTerm);
@@ -56,7 +57,6 @@ export default function StudentGradesScreen() {
   };
 
   const gpaColor = (g: number) => g >= 3.5 ? COLORS.success : g >= 2.5 ? COLORS.warning : COLORS.danger;
-  const gpaBg = (g: number) => g >= 3.5 ? COLORS.successBg : g >= 2.5 ? COLORS.warningBg : COLORS.dangerBg;
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
 
@@ -102,20 +102,24 @@ export default function StudentGradesScreen() {
             const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
             return (
               <View style={styles.card}>
-                <View style={styles.cardRow}>
+                <View style={styles.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{item.subject_name ?? 'Subject'}</Text>
                     <Text style={styles.cardMeta}>{item.title} · {className} · {item.term}</Text>
                   </View>
-                  <View style={styles.rightSection}>
-                    {item.grade_letter ? (
-                      <View style={[styles.gradePill, { backgroundColor: COLORS.primaryBg }]}>
-                        <Text style={[styles.gradePillText, { color: COLORS.primary }]}>{item.grade_letter}</Text>
-                      </View>
-                    ) : null}
-                    {item.subject_gpa != null ? (
-                      <Text style={[styles.gpaSmall, { color: gpaColor(item.subject_gpa) }]}>{Number(item.subject_gpa).toFixed(1)}</Text>
-                    ) : null}
+                  {item.subject_gpa != null && (
+                    <Text style={[styles.gpaBadge, { color: gpaColor(item.subject_gpa) }]}>{Number(item.subject_gpa).toFixed(1)} GPA</Text>
+                  )}
+                </View>
+                <View style={styles.gradesRow}>
+                  <View style={styles.gradeCol}>
+                    <Text style={styles.gradeLabel}>Theory</Text>
+                    <Text style={styles.gradeValue}>{item.grade_letter ?? '—'}</Text>
+                  </View>
+                  <View style={styles.gradeDivider} />
+                  <View style={styles.gradeCol}>
+                    <Text style={styles.gradeLabel}>Practical</Text>
+                    <Text style={styles.gradeValue}>{item.practical_grade ?? '—'}</Text>
                   </View>
                 </View>
               </View>
@@ -154,11 +158,13 @@ const styles = StyleSheet.create({
   emptyText: { color: COLORS.textTertiary, fontSize: 15 },
 
   card: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 10, ...SHADOWS.sm },
-  cardRow: { flexDirection: 'row', alignItems: 'center' },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
   cardMeta: { fontSize: 13, color: COLORS.textSecondary },
-  rightSection: { alignItems: 'flex-end', gap: 4 },
-  gradePill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
-  gradePillText: { fontSize: 15, fontWeight: '700' },
-  gpaSmall: { fontSize: 14, fontWeight: '700' },
+  gpaBadge: { fontSize: 15, fontWeight: '800' },
+  gradesRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surfaceAlt, borderRadius: 10, paddingVertical: 10 },
+  gradeCol: { flex: 1, alignItems: 'center' },
+  gradeLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  gradeValue: { fontSize: 18, fontWeight: '800', color: COLORS.text },
+  gradeDivider: { width: 1, height: 32, backgroundColor: COLORS.border },
 });
