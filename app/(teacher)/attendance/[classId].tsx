@@ -127,9 +127,8 @@ export default function TeacherAttendanceScreen() {
     setErrorMsg(null);
     
     try {
-      const recordsToSave = Object.values(attendanceRecords);
+      const recordsToSave = Object.values(attendanceRecords).map(({ student, ...rest }) => rest);
       
-      // Use upsert to update existing or insert new records
       const { error } = await supabase
         .from('attendance_records')
         .upsert(recordsToSave, {

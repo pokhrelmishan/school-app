@@ -75,7 +75,7 @@ export default function TeacherGradesScreen() {
           term,
           created_at,
           entered_by,
-          student:profiles(id, full_name)
+          student:profiles!grade_entries_student_id_fkey(id, full_name)
         `)
         .eq('class_id', classId)
         .order('created_at', { ascending: false });
@@ -144,7 +144,7 @@ export default function TeacherGradesScreen() {
           term,
           created_at,
           entered_by,
-          student:profiles(id, full_name)
+          student:profiles!grade_entries_student_id_fkey(id, full_name)
         `)
         .single();
 
