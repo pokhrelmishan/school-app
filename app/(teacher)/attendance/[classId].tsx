@@ -158,12 +158,7 @@ export default function TeacherAttendanceScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mark Attendance</Text>
-        <TextInput
-          style={styles.dateInput}
-          value={selectedDate}
-          onChangeText={setSelectedDate}
-          placeholder="YYYY-MM-DD"
-        />
+        <Text style={styles.dateLabel}>Today: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
       </View>
 
       {loading ? (
@@ -261,14 +256,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.ink,
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  dateInput: {
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    borderRadius: 6,
-    padding: 8,
-    backgroundColor: COLORS.paperDim,
+  dateLabel: {
+    fontSize: 14,
+    color: COLORS.graphite,
   },
   loader: {
     marginTop: 32,
