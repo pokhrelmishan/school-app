@@ -69,7 +69,7 @@ export default function TeacherDashboardScreen() {
             {classes.length > 0 ? classes.map(c => c.name).join(', ') : 'None assigned'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.overviewCard} activeOpacity={0.7} onPress={() => router.push('/(teacher)/assignments')}>
+        <TouchableOpacity style={styles.overviewCard} activeOpacity={0.7} onPress={() => router.push('/(teacher)/classes')}>
           <Text style={styles.overviewNumber}>{pendingAssignments}</Text>
           <Text style={styles.overviewLabel}>Assignments</Text>
         </TouchableOpacity>
@@ -91,13 +91,13 @@ export default function TeacherDashboardScreen() {
       {/* Quick Actions */}
       <Text style={styles.sectionLabel}>Quick Actions</Text>
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: COLORS.successBg }]} activeOpacity={0.7} onPress={() => router.push('/(teacher)/classes')}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: COLORS.successBg }]} activeOpacity={0.7} onPress={() => router.push('/(teacher)/attendance')}>
           <Text style={[styles.actionEmoji]}>✓</Text>
           <Text style={[styles.actionTitle, { color: COLORS.success }]}>Mark Attendance</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: COLORS.primaryBg }]} activeOpacity={0.7} onPress={() => router.push('/(teacher)/assignments')}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: COLORS.primaryBg }]} activeOpacity={0.7} onPress={() => router.push('/(teacher)/classes')}>
           <Text style={styles.actionEmoji}>📝</Text>
-          <Text style={[styles.actionTitle, { color: COLORS.primary }]}>Create Assignment</Text>
+          <Text style={[styles.actionTitle, { color: COLORS.primary }]}>Assignments</Text>
         </TouchableOpacity>
       </View>
 

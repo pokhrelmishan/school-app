@@ -11,13 +11,8 @@ function TabIcon({ icon, focused }: { icon: string; focused: boolean }) {
 }
 
 const tabStyles = StyleSheet.create({
-  icon: {
-    fontSize: 22,
-    opacity: 0.4,
-  },
-  iconActive: {
-    opacity: 1,
-  },
+  icon: { fontSize: 22, opacity: 0.4 },
+  iconActive: { opacity: 1 },
 });
 
 export default function TeacherLayout() {
@@ -35,72 +30,33 @@ export default function TeacherLayout() {
           paddingBottom: 10,
           paddingTop: 8,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
-        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
       }}
     >
       <Tabs.Screen
         name="dashboard"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
-        }}
+        options={{ title: 'Home', tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} /> }}
       />
       <Tabs.Screen
         name="classes"
-        options={{
-          title: 'Classes',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📚" focused={focused} />,
-        }}
+        options={{ title: 'Classes', tabBarIcon: ({ focused }) => <TabIcon icon="📚" focused={focused} /> }}
       />
       <Tabs.Screen
-        name="assignments"
-        options={{
-          title: 'Assignments',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📝" focused={focused} />,
-        }}
+        name="attendance"
+        options={{ title: 'Attendance', tabBarIcon: ({ focused }) => <TabIcon icon="✓" focused={focused} /> }}
       />
       <Tabs.Screen
         name="messages"
-        options={{
-          title: 'Messages',
-          tabBarIcon: ({ focused }) => <TabIcon icon="💬" focused={focused} />,
-        }}
+        options={{ title: 'Messages', tabBarIcon: ({ focused }) => <TabIcon icon="💬" focused={focused} /> }}
       />
       <Tabs.Screen
         name="calendar"
-        options={{
-          title: 'Calendar',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} />,
-        }}
+        options={{ title: 'Calendar', tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} /> }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="class/[classId]"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="attendance/[classId]"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="grades/[classId]"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen name="class/[classId]" options={{ href: null }} />
+      <Tabs.Screen name="attendance/[classId]" options={{ href: null }} />
+      <Tabs.Screen name="grades/[classId]" options={{ href: null }} />
     </Tabs>
   );
 }

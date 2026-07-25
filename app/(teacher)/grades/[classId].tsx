@@ -14,7 +14,7 @@ let rowCounter = 0;
 const newRow = (name = '', theory = '', practical = '', gpa = ''): SubjectRow => ({ key: `row_${Date.now()}_${rowCounter++}`, name, theory, practical, gpa });
 
 export default function TeacherGradesEntryScreen() {
-  const { classId } = useLocalSearchParams<{ classId: string }>();
+  const { classId, studentId } = useLocalSearchParams<{ classId: string; studentId?: string }>();
   const { user } = useAuth();
   const router = useRouter();
 
@@ -44,9 +44,19 @@ export default function TeacherGradesEntryScreen() {
 
       const enrollRes = await supabase.from('class_enrollments').select('student:profiles!class_enrollments_student_id_fkey(id, full_name, email, roll_number)').eq('class_id', classId);
       if (enrollRes.data) {
-        setStudents(enrollRes.data.map((e: any) => ({
+        const mappedStudents = enrollRes.data.map((e: any) => ({
           id: e.student?.id, full_name: e.student?.full_name ?? '', email: e.student?.email ?? '', roll_number: e.student?.roll_number ?? ''
-        })).filter((s: Student) => s.id));
+        })).filter((s: Student) => s.id);
+        setStudents(mappedStudents);
+
+        // Auto-select student if studentId param passed
+        if (studentId) {
+          const target = mappedStudents.find((s: Student) => s.id === studentId);
+          if (target) {
+            setSelectedStudent(target);
+            await loadStudentGrades(target.id);
+          }
+        }
       }
     } catch (err) {
       console.error(err);
@@ -55,12 +65,12 @@ export default function TeacherGradesEntryScreen() {
     }
   };
 
-  const loadStudentGrades = async (studentId: string) => {
+  const loadStudentGrades = async (sid: string) => {
     const { data } = await supabase
       .from('grade_entries')
       .select('id, student_id, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term')
       .eq('class_id', classId)
-      .eq('student_id', studentId);
+      .eq('student_id', sid);
     if (data) {
       setSavedGrades(data as SavedGrade[]);
     }
