@@ -31,6 +31,7 @@ export default function TeacherAttendanceScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   const fetchStudentsAndAttendance = async () => {
@@ -138,7 +139,9 @@ export default function TeacherAttendanceScreen() {
       if (error) {
         setErrorMsg(error.message);
       } else {
-        await fetchStudentsAndAttendance(); // Refresh data
+        setSuccessMsg('Attendance saved!');
+        setTimeout(() => setSuccessMsg(null), 2000);
+        await fetchStudentsAndAttendance();
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'An error occurred saving attendance');
@@ -178,6 +181,11 @@ export default function TeacherAttendanceScreen() {
         </View>
       ) : (
         <>
+          {successMsg && (
+            <View style={styles.successBanner}>
+              <Text style={styles.successText}>{successMsg}</Text>
+            </View>
+          )}
           <FlatList
             data={students}
             keyExtractor={(item) => item.id}
@@ -285,6 +293,20 @@ const styles = StyleSheet.create({
   retryText: {
     color: COLORS.paper,
     fontWeight: '600',
+  },
+  successBanner: {
+    backgroundColor: COLORS.chalk + '20',
+    borderWidth: 1,
+    borderColor: COLORS.chalk + '40',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  successText: {
+    color: COLORS.chalk,
+    fontWeight: '700',
+    fontSize: 14,
   },
   emptyContainer: {
     alignItems: 'center',
