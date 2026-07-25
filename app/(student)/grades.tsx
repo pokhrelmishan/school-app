@@ -1,199 +1,125 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../lib/theme';
+import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 
 interface GradeEntry {
   id: string;
-  class_id: string;
-  student_id: string;
   title: string;
   score: number;
   max_score: number;
   term: string;
   created_at: string;
-  entered_by: string;
-  class?: {
-    name: string;
-    grade_level: string;
-    teacher?: {
-      full_name: string;
-    };
-  };
+  class?: { name: string; grade_level: string };
 }
 
 export default function StudentGradesScreen() {
   const { user } = useAuth();
   const [grades, setGrades] = useState<GradeEntry[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
 
   const fetchGrades = async () => {
+    if (!user?.id) return;
     setLoading(true);
-    setErrorMsg(null);
-    try {
-      const query = supabase
-        .from('grade_entries')
-        .select(`
-          id,
-          class_id,
-          student_id,
-          title,
-          score,
-          max_score,
-          term,
-          created_at,
-          entered_by,
-          class:classes(name, grade_level, teacher:profiles!classes_teacher_id_fkey(full_name))
-        `)
-        .eq('student_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (selectedTerm) {
-        query.eq('term', selectedTerm);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        setErrorMsg(error.message);
-      } else if (data) {
-        setGrades(data as unknown as GradeEntry[]);
-      }
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'An error occurred fetching grades');
-    } finally {
-      setLoading(false);
-    }
+    let q = supabase
+      .from('grade_entries')
+      .select('id, title, score, max_score, term, created_at, class:classes(name, grade_level)')
+      .eq('student_id', user.id)
+      .order('created_at', { ascending: false });
+    if (selectedTerm) q = q.eq('term', selectedTerm);
+    const { data } = await q;
+    if (data) setGrades(data as unknown as GradeEntry[]);
+    setLoading(false);
   };
 
-  const getGradePercent = (score: number, max: number) => {
-    return Math.round((score / max) * 100);
-  };
-
-  const getScoreColor = (percent: number) => {
-    if (percent >= 90) return COLORS.chalk;
-    if (percent >= 70) return COLORS.pencil;
-    if (percent >= 50) return COLORS.ink;
-    return COLORS.danger;
-  };
-
-  const getUniqueTerms = () => {
-    const terms = grades.map(grade => grade.term);
-    return Array.from(new Set(terms)).sort((a, b) => b.localeCompare(a)); // Most recent first
-  };
+  useEffect(() => { fetchGrades(); }, [user?.id, selectedTerm]);
 
   const getGradeStats = () => {
     if (grades.length === 0) return null;
-    
-    const total = grades.reduce((sum, grade) => sum + grade.score, 0);
-    const maxTotal = grades.reduce((sum, grade) => sum + grade.max_score, 0);
-    const overallPercent = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
-    
-    const letterGrade = overallPercent >= 90 ? 'A' :
-                       overallPercent >= 80 ? 'B' :
-                       overallPercent >= 70 ? 'C' :
-                       overallPercent >= 60 ? 'D' : 'F';
-    
-    return { overallPercent, letterGrade, count: grades.length };
+    const total = grades.reduce((s, g) => s + g.score, 0);
+    const max = grades.reduce((s, g) => s + g.max_score, 0);
+    const pct = max > 0 ? (total / max) * 100 : 0;
+    const letter = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'F';
+    return { pct, letter, count: grades.length };
+  };
+
+  const getUniqueTerms = () => {
+    return Array.from(new Set(grades.map(g => g.term))).sort((a, b) => b.localeCompare(a));
   };
 
   const stats = getGradeStats();
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchGrades();
-    }
-  }, [user?.id, selectedTerm]);
+  const gradeColor = (pct: number) => pct >= 90 ? COLORS.success : pct >= 70 ? COLORS.primary : pct >= 50 ? COLORS.warning : COLORS.danger;
+  const gradeBg = (pct: number) => pct >= 90 ? COLORS.successBg : pct >= 70 ? COLORS.primaryBg : pct >= 50 ? COLORS.warningBg : COLORS.dangerBg;
+
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>My Report Card</Text>
+      <Text style={styles.headerTitle}>Grades</Text>
 
       {stats && (
-        <View style={styles.statsContainer}>
-          <View style={styles.overallGradeCard}>
-            <Text style={styles.overallGradeLabel}>Overall Grade</Text>
-            <Text style={[styles.overallGradeValue, { color: getScoreColor(stats.overallPercent) }]}>
-              {stats.letterGrade}
-            </Text>
-            <Text style={styles.overallGradePercent}>{stats.overallPercent.toFixed(1)}%</Text>
-            <Text style={styles.overallGradeCount}>({stats.count} assignments)</Text>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryLeft}>
+            <Text style={[styles.summaryGrade, { color: gradeColor(stats.pct) }]}>{stats.letter}</Text>
+            <Text style={styles.summaryPct}>{stats.pct.toFixed(1)}%</Text>
+            <Text style={styles.summaryCount}>{stats.count} assignments</Text>
+          </View>
+          <View style={styles.summaryBar}>
+            <View style={[styles.summaryBarFill, { width: `${Math.min(stats.pct, 100)}%`, backgroundColor: gradeColor(stats.pct) }]} />
           </View>
         </View>
       )}
 
-      <View style={styles.termSelector}>
-        <TouchableOpacity 
-          style={[styles.termButton, !selectedTerm && styles.termButtonActive]}
-          onPress={() => setSelectedTerm(null)}
-        >
-          <Text style={[styles.termButtonText, !selectedTerm && styles.termButtonTextActive]}>All</Text>
-        </TouchableOpacity>
-        
-        {getUniqueTerms().map(term => (
-          <TouchableOpacity 
-            key={term}
-            style={[styles.termButton, selectedTerm === term && styles.termButtonActive]}
-            onPress={() => setSelectedTerm(term)}
+      {getUniqueTerms().length > 0 && (
+        <View style={styles.termRow}>
+          <TouchableOpacity
+            style={[styles.termPill, !selectedTerm && styles.termPillActive]}
+            onPress={() => setSelectedTerm(null)}
           >
-            <Text style={[styles.termButtonText, selectedTerm === term && styles.termButtonTextActive]}>
-              {term}
-            </Text>
+            <Text style={[styles.termPillText, !selectedTerm && styles.termPillTextActive]}>All</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {loading ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
-      ) : errorMsg ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchGrades}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
+          {getUniqueTerms().map(term => (
+            <TouchableOpacity
+              key={term}
+              style={[styles.termPill, selectedTerm === term && styles.termPillActive]}
+              onPress={() => setSelectedTerm(term)}
+            >
+              <Text style={[styles.termPillText, selectedTerm === term && styles.termPillTextActive]}>{term}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      ) : grades.length === 0 ? (
+      )}
+
+      {grades.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No grade entries found.</Text>
+          <Text style={styles.emptyText}>No grades found</Text>
         </View>
       ) : (
         <FlatList
           data={grades}
           keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
-            const percent = getGradePercent(item.score, item.max_score);
+            const pct = Math.round((item.score / item.max_score) * 100);
+            const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
             return (
               <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View>
-                    <Text style={styles.titleText}>{item.title}</Text>
-                    <Text style={styles.termText}>Term: {item.term}</Text>
+                <View style={styles.cardRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardMeta}>{className} · {item.term}</Text>
                   </View>
-                  
-                  <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(percent) }]}>
-                    <Text style={styles.scoreBadgeText}>{percent}%</Text>
+                  <View style={[styles.pill, { backgroundColor: gradeBg(pct) }]}>
+                    <Text style={[styles.pillText, { color: gradeColor(pct) }]}>{pct}%</Text>
                   </View>
                 </View>
-
-                <View style={styles.cardContent}>
-                  <Text style={styles.scoreText}>{item.score}/{item.max_score}</Text>
-                  
-                  <View>
-                    <Text style={styles.classText}>{item.class?.name || 'Unknown Class'}</Text>
-                    <Text style={styles.gradeLevelText}>{item.class?.grade_level || ''}</Text>
-                  </View>
-                  
-                  {item.class?.teacher?.full_name && (
-                    <Text style={styles.teacherText}>Teacher: {item.class.teacher.full_name}</Text>
-                  )}
+                <View style={styles.scoreRow}>
+                  <Text style={styles.scoreText}>{item.score} / {item.max_score}</Text>
+                  <Text style={styles.dateText}>{new Date(item.created_at).toLocaleDateString()}</Text>
                 </View>
-
-                <Text style={styles.dateText}>
-                  {new Date(item.created_at).toLocaleDateString()}
-                </Text>
               </View>
             );
           }}
@@ -204,171 +130,54 @@ export default function StudentGradesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.paper,
-    padding: 16,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-    marginBottom: 16,
-  },
-  statsContainer: {
+  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: COLORS.text, letterSpacing: -0.5, marginBottom: 20 },
+
+  summaryCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 24,
     marginBottom: 20,
-  },
-  overallGradeCard: {
-    backgroundColor: COLORS.paperDim,
-    borderRadius: 12,
-    padding: 20,
     alignItems: 'center',
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    ...SHADOWS.md,
   },
-  overallGradeLabel: {
-    fontSize: 14,
-    color: COLORS.graphite,
-    marginBottom: 8,
-  },
-  overallGradeValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  overallGradePercent: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.ink,
-    marginBottom: 4,
-  },
-  overallGradeCount: {
-    fontSize: 14,
-    color: COLORS.graphite,
-  },
-  termSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  termButton: {
+  summaryLeft: { alignItems: 'center', marginBottom: 16 },
+  summaryGrade: { fontSize: 52, fontWeight: '800' },
+  summaryPct: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginTop: 4 },
+  summaryCount: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
+  summaryBar: { width: '100%', height: 6, backgroundColor: COLORS.surfaceAlt, borderRadius: 3 },
+  summaryBarFill: { height: 6, borderRadius: 3 },
+
+  termRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  termPill: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: COLORS.paperDim,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
-  termButtonActive: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
-  },
-  termButtonText: {
-    color: COLORS.ink,
-    fontWeight: '500',
-  },
-  termButtonTextActive: {
-    color: COLORS.paper,
-    fontWeight: '600',
-  },
-  loader: {
-    marginTop: 32,
-  },
-  errorContainer: {
-    padding: 16,
-    backgroundColor: COLORS.paperDim,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  errorText: {
-    color: COLORS.danger,
-    marginBottom: 8,
-  },
-  retryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: COLORS.cover,
-    borderRadius: 6,
-  },
-  retryText: {
-    color: COLORS.paper,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  emptyText: {
-    color: COLORS.graphite,
-    fontSize: 16,
-    textAlign: 'center',
-  },
+  termPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  termPillText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  termPillTextActive: { color: COLORS.textInverse },
+
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyText: { color: COLORS.textTertiary, fontSize: 15 },
+
   card: {
-    backgroundColor: COLORS.paperDim,
-    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    marginBottom: 10,
+    ...SHADOWS.sm,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  titleText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-    marginBottom: 4,
-  },
-  termText: {
-    fontSize: 14,
-    color: COLORS.graphite,
-  },
-  scoreBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  scoreBadgeText: {
-    color: COLORS.paper,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  scoreText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-  },
-  classText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.ink,
-    marginBottom: 4,
-  },
-  gradeLevelText: {
-    fontSize: 14,
-    color: COLORS.graphite,
-  },
-  teacherText: {
-    fontSize: 12,
-    color: COLORS.graphite,
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  dateText: {
-    fontSize: 12,
-    color: COLORS.graphite,
-    fontStyle: 'italic',
-  },
+  cardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  cardMeta: { fontSize: 13, color: COLORS.textSecondary },
+  pill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
+  pillText: { fontSize: 14, fontWeight: '700' },
+  scoreRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  scoreText: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  dateText: { fontSize: 13, color: COLORS.textTertiary },
 });

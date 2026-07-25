@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../lib/theme';
+import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 
 interface School {
@@ -107,10 +107,10 @@ export default function AdminDashboardScreen() {
   const OverviewTab = () => (
     <ScrollView showsVerticalScrollIndicator={false}>
       <View style={styles.statGrid}>
-        <StatCard label="Schools" value={schools.length} color={COLORS.tape} />
-        <StatCard label="Teachers" value={teacherCount} color={COLORS.pencil} />
-        <StatCard label="Students" value={studentCount} color={COLORS.chalk} />
-        <StatCard label="Parents" value={parentCount} color={COLORS.graphite} />
+        <StatCard label="Schools" value={schools.length} color={COLORS.danger} />
+        <StatCard label="Teachers" value={teacherCount} color={COLORS.primary} />
+        <StatCard label="Students" value={studentCount} color={COLORS.success} />
+        <StatCard label="Parents" value={parentCount} color={COLORS.textSecondary} />
       </View>
 
       <SectionHeader title="Schools" />
@@ -123,7 +123,7 @@ export default function AdminDashboardScreen() {
       ) : (
         schools.map(school => (
           <View key={school.id} style={styles.card}>
-            <View style={[styles.cardAccent, { backgroundColor: COLORS.tape }]} />
+            <View style={[styles.cardAccent, { backgroundColor: COLORS.danger }]} />
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle}>{school.name}</Text>
               <Text style={styles.cardMeta}>Created {new Date(school.created_at).toLocaleDateString()}</Text>
@@ -162,10 +162,10 @@ export default function AdminDashboardScreen() {
 
   const UsersTab = () => {
     const grouped = [
-      { role: 'admin', users: profiles.filter(p => p.role === 'admin'), color: COLORS.tape },
-      { role: 'teacher', users: profiles.filter(p => p.role === 'teacher'), color: COLORS.pencil },
-      { role: 'student', users: profiles.filter(p => p.role === 'student'), color: COLORS.chalk },
-      { role: 'parent', users: profiles.filter(p => p.role === 'parent'), color: COLORS.graphite },
+      { role: 'admin', users: profiles.filter(p => p.role === 'admin'), color: COLORS.danger },
+      { role: 'teacher', users: profiles.filter(p => p.role === 'teacher'), color: COLORS.primary },
+      { role: 'student', users: profiles.filter(p => p.role === 'student'), color: COLORS.success },
+      { role: 'parent', users: profiles.filter(p => p.role === 'parent'), color: COLORS.textSecondary },
     ];
 
     return (
@@ -214,7 +214,7 @@ export default function AdminDashboardScreen() {
       ) : (
         classes.map(cls => (
           <View key={cls.id} style={styles.card}>
-            <View style={[styles.cardAccent, { backgroundColor: COLORS.chalk }]} />
+            <View style={[styles.cardAccent, { backgroundColor: COLORS.primary }]} />
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle}>{cls.name}</Text>
               <Text style={styles.cardMeta}>Grade {cls.grade_level}</Text>
@@ -229,11 +229,11 @@ export default function AdminDashboardScreen() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'admin': return COLORS.tape;
-      case 'teacher': return COLORS.pencil;
-      case 'student': return COLORS.chalk;
-      case 'parent': return COLORS.graphite;
-      default: return COLORS.ink;
+      case 'admin': return COLORS.danger;
+      case 'teacher': return COLORS.primary;
+      case 'student': return COLORS.success;
+      case 'parent': return COLORS.textSecondary;
+      default: return COLORS.text;
     }
   };
 
@@ -274,7 +274,7 @@ export default function AdminDashboardScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={{ marginTop: 48 }} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 48 }} />
       ) : errorMsg ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{errorMsg}</Text>
@@ -296,23 +296,23 @@ export default function AdminDashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
   },
   header: {
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.paper,
+    color: COLORS.surface,
     letterSpacing: -0.5,
   },
   headerSubtitle: {
     fontSize: 15,
-    color: COLORS.graphiteLight,
+    color: COLORS.textTertiary,
     marginTop: 4,
   },
   headerRow: {
@@ -325,24 +325,24 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.graphite,
+    borderColor: COLORS.textSecondary,
   },
   headerLogoPlaceholder: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerLogoText: {
     fontSize: 22,
     fontWeight: '800',
-    color: COLORS.paper,
+    color: COLORS.surface,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     paddingHorizontal: 16,
     paddingBottom: 0,
     gap: 4,
@@ -355,15 +355,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: COLORS.pencil,
+    borderBottomColor: COLORS.primary,
   },
   tabText: {
-    color: COLORS.graphiteLight,
+    color: COLORS.textTertiary,
     fontWeight: '600',
     fontSize: 14,
   },
   tabTextActive: {
-    color: COLORS.paper,
+    color: COLORS.surface,
   },
   statGrid: {
     flexDirection: 'row',
@@ -373,11 +373,11 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: '47%',
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   statAccent: {
     width: 24,
@@ -388,11 +388,11 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 32,
     fontWeight: '800',
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   statLabel: {
     fontSize: 13,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginTop: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -407,25 +407,24 @@ const styles = StyleSheet.create({
   sectionLine: {
     flex: 1,
     height: 1,
-    backgroundColor: COLORS.line,
+    backgroundColor: COLORS.border,
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginHorizontal: 12,
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     marginHorizontal: 16,
     marginBottom: 8,
     borderRadius: 10,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    ...SHADOWS.sm,
   },
   cardAccent: {
     width: 5,
@@ -442,11 +441,11 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   cardMeta: {
     fontSize: 13,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginTop: 4,
   },
   badge: {
@@ -472,18 +471,18 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 17,
     fontWeight: '700',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   emptyHint: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
   errorBox: {
     margin: 16,
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.danger + '30',
@@ -497,11 +496,11 @@ const styles = StyleSheet.create({
   retryBtn: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '700',
   },
 });

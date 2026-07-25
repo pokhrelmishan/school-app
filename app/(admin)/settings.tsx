@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../lib/theme';
+import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 
 interface School {
@@ -182,7 +182,7 @@ export default function AdminSettingsScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.chalk} />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -233,7 +233,7 @@ export default function AdminSettingsScreen() {
 
           {uploading && (
             <View style={styles.uploadingRow}>
-              <ActivityIndicator size="small" color={COLORS.pencil} />
+              <ActivityIndicator size="small" color={COLORS.primary} />
               <Text style={styles.uploadingText}>Uploading...</Text>
             </View>
           )}
@@ -292,24 +292,24 @@ export default function AdminSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
   },
   header: {
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.paper,
+    color: COLORS.surface,
     letterSpacing: -0.5,
   },
   scroll: {
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 12,
@@ -327,11 +327,10 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 24,
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    ...SHADOWS.sm,
   },
   logoPreview: {
     width: 100,
@@ -340,7 +339,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   logoImage: {
     width: '100%',
@@ -350,7 +349,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 16,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -358,25 +357,25 @@ const styles = StyleSheet.create({
   logoPlaceholderText: {
     fontSize: 40,
     fontWeight: '800',
-    color: COLORS.pencil,
+    color: COLORS.primary,
   },
   logoActions: {
     flexDirection: 'row',
     gap: 12,
   },
   logoButton: {
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   logoButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '700',
     fontSize: 14,
   },
   removeButton: {
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -395,7 +394,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   uploadingText: {
-    color: COLORS.pencil,
+    color: COLORS.primary,
     fontWeight: '600',
   },
   nameSection: {
@@ -405,16 +404,16 @@ const styles = StyleSheet.create({
   },
   nameInput: {
     flex: 1,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     borderRadius: 8,
     padding: 14,
     fontSize: 16,
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   saveButton: {
-    backgroundColor: COLORS.pencil,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 8,
@@ -423,7 +422,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   saveButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -440,24 +439,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   successBox: {
-    backgroundColor: COLORS.chalk + '15',
+    backgroundColor: COLORS.success + '15',
     borderWidth: 1,
-    borderColor: COLORS.chalk + '30',
+    borderColor: COLORS.success + '30',
     borderRadius: 8,
     padding: 12,
     marginTop: 16,
   },
   successText: {
-    color: COLORS.chalk,
+    color: COLORS.success,
     fontSize: 13,
     fontWeight: '600',
   },
   infoCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    ...SHADOWS.sm,
   },
   infoRow: {
     flexDirection: 'row',
@@ -467,17 +465,17 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   infoValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     fontFamily: 'Courier',
   },
   infoDivider: {
     height: 1,
-    backgroundColor: COLORS.line,
+    backgroundColor: COLORS.border,
     marginVertical: 4,
   },
 });

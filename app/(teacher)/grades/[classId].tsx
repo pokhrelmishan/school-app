@@ -202,9 +202,9 @@ export default function TeacherGradesScreen() {
   };
 
   const getScoreColor = (percent: number) => {
-    if (percent >= 90) return COLORS.chalk;
-    if (percent >= 70) return COLORS.pencil;
-    if (percent >= 50) return COLORS.ink;
+    if (percent >= 90) return COLORS.success;
+    if (percent >= 70) return COLORS.primary;
+    if (percent >= 50) return COLORS.text;
     return COLORS.danger;
   };
 
@@ -217,7 +217,7 @@ export default function TeacherGradesScreen() {
       <Text style={styles.headerTitle}>Enter Grades</Text>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
       ) : errorMsg ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{errorMsg}</Text>
@@ -334,13 +334,13 @@ export default function TeacherGradesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 20,
   },
   loader: {
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 16,
@@ -360,11 +360,11 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     borderRadius: 6,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -372,17 +372,17 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },
   studentCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   studentHeader: {
     flexDirection: 'row',
@@ -393,33 +393,33 @@ const styles = StyleSheet.create({
   studentName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   addGradeButton: {
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
   },
   addGradeButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
     fontSize: 14,
   },
   addGradeForm: {
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     padding: 16,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     marginBottom: 16,
   },
   formInput: {
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     borderRadius: 6,
     padding: 12,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     marginBottom: 12,
   },
   scoreRow: {
@@ -434,16 +434,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   saveGradeButton: {
-    backgroundColor: COLORS.pencil,
+    backgroundColor: COLORS.primary,
     paddingVertical: 12,
     borderRadius: 6,
     alignItems: 'center',
   },
   saveGradeButtonDisabled: {
-    backgroundColor: COLORS.graphite,
+    backgroundColor: COLORS.textSecondary,
   },
   saveGradeButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: 'bold',
     fontSize: 14,
   },
@@ -453,11 +453,11 @@ const styles = StyleSheet.create({
   gradesTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 12,
   },
   gradeCard: {
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderRadius: 6,
     padding: 12,
     marginBottom: 8,
@@ -471,12 +471,12 @@ const styles = StyleSheet.create({
   gradeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   gradeTerm: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   gradeScore: {
     alignItems: 'flex-end',
@@ -488,6 +488,6 @@ const styles = StyleSheet.create({
   },
   gradeDate: {
     fontSize: 12,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
 });

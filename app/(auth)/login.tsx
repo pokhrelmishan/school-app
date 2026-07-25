@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../../lib/auth';
-import { COLORS } from '../../lib/theme';
+import { COLORS, SHADOWS } from '../../lib/theme';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const { login } = useAuth();
 
   const handleSubmit = async () => {
@@ -14,10 +15,8 @@ const Login = () => {
       setError('Please enter both email and password');
       return;
     }
-
     try {
       await login(email, password);
-      // AuthGate in _layout.tsx will redirect to the correct role screen
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     }
@@ -25,42 +24,65 @@ const Login = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.formContainer}>
-        <Text style={styles.title}>Login</Text>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-          />
-        </View>
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboard}
+      >
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <Text style={styles.logoIcon}>🎓</Text>
+            </View>
+            <Text style={styles.title}>Edify International</Text>
+            <Text style={styles.subtitle}>Sign in to your account</Text>
           </View>
-        )}
 
-        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>Login</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.formCard}>
+            {error && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email address</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'email' && styles.inputFocused]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={COLORS.textTertiary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'password' && styles.inputFocused]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={COLORS.textTertiary}
+                secureTextEntry
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.8}>
+              <Text style={styles.buttonText}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.footer}>
+            International School Management System
+          </Text>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -68,65 +90,100 @@ const Login = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
   },
-  formContainer: {
+  keyboard: {
     flex: 1,
-    padding: 20,
+  },
+  content: {
+    flex: 1,
     justifyContent: 'center',
-    maxWidth: 400,
-    alignSelf: 'center',
-    width: '100%',
+    padding: 24,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: COLORS.cover,
-    marginBottom: 32,
-    textAlign: 'center',
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
-  inputGroup: {
+  logoContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    backgroundColor: COLORS.primaryBg,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  label: {
+  logoIcon: {
+    fontSize: 36,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.text,
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  subtitle: {
     fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  formCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 24,
+    ...SHADOWS.md,
+  },
+  inputGroup: {
+    marginBottom: 18,
+  },
+  label: {
+    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: COLORS.paperDim,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
-    color: COLORS.ink,
+    color: COLORS.text,
   },
-  errorContainer: {
-    backgroundColor: COLORS.danger + '20',
-    borderWidth: 1,
-    borderColor: COLORS.danger,
-    borderRadius: 8,
+  inputFocused: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+  },
+  errorBanner: {
+    backgroundColor: COLORS.dangerBg,
+    borderRadius: 10,
     padding: 12,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   errorText: {
     color: COLORS.danger,
     fontSize: 14,
+    fontWeight: '500',
     textAlign: 'center',
   },
   button: {
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
   },
   buttonText: {
-    color: COLORS.paper,
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: COLORS.textInverse,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footer: {
+    textAlign: 'center',
+    color: COLORS.textTertiary,
+    fontSize: 13,
+    marginTop: 32,
   },
 });
 

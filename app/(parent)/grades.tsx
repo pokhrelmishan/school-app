@@ -118,9 +118,9 @@ export default function ParentGradesScreen() {
   };
 
   const getScoreColor = (percent: number) => {
-    if (percent >= 90) return COLORS.chalk;
-    if (percent >= 70) return COLORS.pencil;
-    if (percent >= 50) return COLORS.ink;
+    if (percent >= 90) return COLORS.success;
+    if (percent >= 70) return COLORS.primary;
+    if (percent >= 50) return COLORS.text;
     return COLORS.danger;
   };
 
@@ -161,7 +161,7 @@ export default function ParentGradesScreen() {
       <Text style={styles.headerTitle}>Child's Report Card</Text>
 
       {loading && linkedStudents.length === 0 ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
       ) : linkedStudents.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No children linked to your account.</Text>
@@ -222,7 +222,7 @@ export default function ParentGradesScreen() {
               </View>
 
               {loading ? (
-                <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+                <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
               ) : errorMsg ? (
                 <View style={styles.errorContainer}>
                   <Text style={styles.errorText}>{errorMsg}</Text>
@@ -285,13 +285,13 @@ export default function ParentGradesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 16,
   },
   loader: {
@@ -302,13 +302,13 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 16,
@@ -320,11 +320,11 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     borderRadius: 6,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   studentSelector: {
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   selectorLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 12,
   },
   studentButtons: {
@@ -345,36 +345,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   studentButtonSelected: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   studentButtonText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontWeight: '500',
   },
   studentButtonTextSelected: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   statsContainer: {
     marginBottom: 20,
   },
   overallGradeCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   overallGradeLabel: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginBottom: 8,
   },
   overallGradeValue: {
@@ -385,12 +385,12 @@ const styles = StyleSheet.create({
   overallGradePercent: {
     fontSize: 20,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   overallGradeCount: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   termSelector: {
     flexDirection: 'row',
@@ -402,29 +402,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   termButtonActive: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   termButtonText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontWeight: '500',
   },
   termButtonTextActive: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   card: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -435,12 +435,12 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   termText: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   scoreBadge: {
     paddingHorizontal: 10,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   scoreBadgeText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: 'bold',
     fontSize: 14,
   },
@@ -461,27 +461,27 @@ const styles = StyleSheet.create({
   scoreText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   classText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   gradeLevelText: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   teacherText: {
     fontSize: 12,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontStyle: 'italic',
     marginTop: 4,
   },
   dateText: {
     fontSize: 12,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontStyle: 'italic',
   },
 });

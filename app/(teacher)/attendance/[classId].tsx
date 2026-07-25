@@ -163,7 +163,7 @@ export default function TeacherAttendanceScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
       ) : errorMsg ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{errorMsg}</Text>
@@ -258,7 +258,7 @@ export default function TeacherAttendanceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 16,
   },
   header: {
@@ -267,19 +267,19 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   dateLabel: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   loader: {
     marginTop: 32,
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 16,
@@ -291,38 +291,38 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     borderRadius: 6,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   lockedBanner: {
-    backgroundColor: COLORS.graphite + '15',
+    backgroundColor: COLORS.textSecondary + '15',
     borderWidth: 1,
-    borderColor: COLORS.graphite + '30',
+    borderColor: COLORS.textSecondary + '30',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     alignItems: 'center',
   },
   lockedText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontWeight: '700',
     fontSize: 14,
   },
   successBanner: {
-    backgroundColor: COLORS.chalk + '20',
+    backgroundColor: COLORS.success + '20',
     borderWidth: 1,
-    borderColor: COLORS.chalk + '40',
+    borderColor: COLORS.success + '40',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     alignItems: 'center',
   },
   successText: {
-    color: COLORS.chalk,
+    color: COLORS.success,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -331,17 +331,17 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },
   studentCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   studentCardLocked: {
     opacity: 0.7,
@@ -352,12 +352,12 @@ const styles = StyleSheet.create({
   studentName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   studentEmail: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   statusSection: {
     marginBottom: 16,
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 8,
   },
   statusButtons: {
@@ -377,23 +377,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   statusButtonSelected: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   statusButtonLocked: {
     opacity: 0.6,
   },
   statusButtonText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontSize: 12,
   },
   statusButtonTextSelected: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   notesSection: {
@@ -401,18 +401,18 @@ const styles = StyleSheet.create({
   },
   notesInput: {
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     borderRadius: 6,
     padding: 12,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     textAlignVertical: 'top',
     minHeight: 60,
   },
   notesInputLocked: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
   },
   saveButton: {
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -420,10 +420,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   saveButtonDisabled: {
-    backgroundColor: COLORS.graphite,
+    backgroundColor: COLORS.textSecondary,
   },
   saveButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },

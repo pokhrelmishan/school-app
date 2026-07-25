@@ -53,7 +53,7 @@ export default function TeacherClassesScreen() {
       <Text style={styles.headerTitle}>My Classes</Text>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
       ) : errorMsg ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{errorMsg}</Text>
@@ -106,13 +106,13 @@ export default function TeacherClassesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 16,
   },
   loader: {
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 16,
@@ -132,11 +132,11 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     borderRadius: 6,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -144,27 +144,27 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   className: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 8,
   },
   gradeLevel: {
     fontSize: 16,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginBottom: 16,
   },
   actionButtons: {
@@ -179,13 +179,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   attendanceButton: {
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
   },
   gradesButton: {
-    backgroundColor: COLORS.pencil,
+    backgroundColor: COLORS.primary,
   },
   actionButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
     fontSize: 14,
   },

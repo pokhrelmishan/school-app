@@ -12,7 +12,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
     Seed: '✦',
   };
   return (
-    <Text style={{ fontSize: 20, color: focused ? COLORS.pencil : COLORS.graphiteLight, opacity: focused ? 1 : 0.6 }}>
+    <Text style={{ fontSize: 20, color: focused ? COLORS.primary : COLORS.textTertiary, opacity: focused ? 1 : 0.6 }}>
       {icons[label] || '●'}
     </Text>
   );
@@ -24,15 +24,15 @@ export default function AdminLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: COLORS.cover,
-          borderTopColor: COLORS.graphite,
+          backgroundColor: COLORS.primaryDark,
+          borderTopColor: COLORS.textSecondary,
           borderTopWidth: 0.5,
           height: 60,
           paddingBottom: 8,
           paddingTop: 6,
         },
-        tabBarActiveTintColor: COLORS.pencil,
-        tabBarInactiveTintColor: COLORS.graphiteLight,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textTertiary,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',

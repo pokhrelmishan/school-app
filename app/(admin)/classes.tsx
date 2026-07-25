@@ -174,7 +174,7 @@ export default function AdminClassesScreen() {
       </TouchableOpacity>
 
       {loading && classes.length === 0 ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
       ) : errorMsg ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{errorMsg}</Text>
@@ -285,24 +285,24 @@ export default function AdminClassesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 20,
   },
   addButton: {
-    backgroundColor: COLORS.pencil,
+    backgroundColor: COLORS.primary,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 20,
   },
   addButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 16,
@@ -323,11 +323,11 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     borderRadius: 6,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -335,27 +335,27 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 8,
   },
   cardText: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   modalOverlay: {
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 20,
     width: '90%',
@@ -374,16 +374,16 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 20,
     textAlign: 'center',
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     borderRadius: 8,
     padding: 12,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     marginBottom: 16,
   },
   modalSelectContainer: {
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   modalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 8,
   },
   teacherSelector: {
@@ -404,20 +404,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   teacherOptionSelected: {
-    backgroundColor: COLORS.pencil,
-    borderColor: COLORS.pencil,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   teacherOptionText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontSize: 14,
   },
   teacherOptionTextSelected: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   schoolSelector: {
@@ -429,20 +429,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   schoolOptionSelected: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   schoolOptionText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontSize: 14,
   },
   schoolOptionTextSelected: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   modalButtonRow: {
@@ -458,13 +458,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: COLORS.graphite,
+    backgroundColor: COLORS.textSecondary,
   },
   saveButton: {
-    backgroundColor: COLORS.pencil,
+    backgroundColor: COLORS.primary,
   },
   modalButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
     fontSize: 16,
   },

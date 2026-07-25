@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../lib/theme';
+import { COLORS, SHADOWS } from '../../lib/theme';
 
 interface Counts {
   teachers: number;
@@ -66,7 +66,7 @@ export default function AdminSeedScreen() {
 
       <View style={styles.content}>
         {loading ? (
-          <ActivityIndicator size="large" color={COLORS.chalk} style={{ marginTop: 32 }} />
+          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 32 }} />
         ) : isSeeded ? (
           <>
             <View style={styles.statusCard}>
@@ -140,18 +140,18 @@ export default function AdminSeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
   },
   header: {
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.paper,
+    color: COLORS.surface,
     letterSpacing: -0.5,
   },
   content: {
@@ -160,9 +160,9 @@ const styles = StyleSheet.create({
   statusCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.chalk + '15',
+    backgroundColor: COLORS.success + '15',
     borderWidth: 1,
-    borderColor: COLORS.chalk + '30',
+    borderColor: COLORS.success + '30',
     borderRadius: 10,
     padding: 14,
     gap: 10,
@@ -171,28 +171,27 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.success,
   },
   statusText: {
-    color: COLORS.chalk,
+    color: COLORS.success,
     fontWeight: '700',
     fontSize: 15,
   },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginTop: 24,
     marginBottom: 10,
   },
   countsCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    ...SHADOWS.sm,
   },
   countRow: {
     flexDirection: 'row',
@@ -202,10 +201,10 @@ const styles = StyleSheet.create({
   },
   countLabel: {
     fontSize: 15,
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   countBadge: {
-    backgroundColor: COLORS.pencil + '20',
+    backgroundColor: COLORS.primary + '20',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
@@ -213,28 +212,27 @@ const styles = StyleSheet.create({
   countValue: {
     fontSize: 15,
     fontWeight: '800',
-    color: COLORS.pencil,
+    color: COLORS.primary,
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.line,
+    backgroundColor: COLORS.border,
   },
   hint: {
     fontSize: 13,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginBottom: 10,
   },
   accountsCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    ...SHADOWS.sm,
   },
   accountRole: {
     fontSize: 13,
     fontWeight: '700',
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -242,49 +240,48 @@ const styles = StyleSheet.create({
   },
   accountEmail: {
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.text,
     fontFamily: 'Courier',
     marginBottom: 2,
   },
   accountDivider: {
     height: 1,
-    backgroundColor: COLORS.line,
+    backgroundColor: COLORS.border,
     marginVertical: 8,
   },
   emptyCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 24,
-    borderWidth: 1,
-    borderColor: COLORS.line,
+    ...SHADOWS.sm,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     lineHeight: 20,
     marginBottom: 16,
   },
   emptyStep: {
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 6,
     paddingLeft: 8,
   },
   refreshButton: {
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 20,
   },
   refreshText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '700',
     fontSize: 15,
   },

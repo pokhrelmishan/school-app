@@ -33,7 +33,7 @@ function AuthGate() {
   if (loading) {
     return (
       <View style={authStyles.center}>
-        <ActivityIndicator size="large" color={COLORS.chalk} />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -41,10 +41,8 @@ function AuthGate() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.cover },
-        headerTintColor: COLORS.paper,
-        headerTitleStyle: { fontWeight: 'bold' },
-        contentStyle: { backgroundColor: COLORS.paper },
+        headerShown: false,
+        contentStyle: { backgroundColor: COLORS.bg },
       }}
     >
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -60,7 +58,7 @@ function AuthGate() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" backgroundColor={COLORS.cover} />
+      <StatusBar style="dark" backgroundColor={COLORS.bg} />
       <AuthGate />
     </AuthProvider>
   );
@@ -71,6 +69,6 @@ const authStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
   },
 });

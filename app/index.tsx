@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { COLORS } from '../lib/theme';
+import { COLORS, SHADOWS } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
@@ -18,7 +18,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color={COLORS.chalk} />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -160,7 +160,7 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 20,
   },
   header: {
@@ -170,36 +170,35 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.cover,
+    color: COLORS.text,
   },
   subtitle: {
     fontSize: 18,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginTop: 8,
   },
   role: {
     fontSize: 14,
-    color: COLORS.chalk,
+    color: COLORS.primary,
     marginTop: 4,
     fontWeight: '600',
   },
   card: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     padding: 20,
-    borderWidth: 1,
-    borderColor: COLORS.line,
     marginBottom: 16,
+    ...SHADOWS.sm,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 8,
   },
   cardText: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     lineHeight: 20,
   },
   formGroup: {
@@ -208,17 +207,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   roleRow: {
     flexDirection: 'row',
@@ -229,31 +228,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   roleButtonActive: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   roleButtonText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontWeight: '500',
   },
   roleButtonTextActive: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '700',
   },
   createButton: {
-    backgroundColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 12,
   },
   createButtonText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontSize: 18,
     fontWeight: 'bold',
   },

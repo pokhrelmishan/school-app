@@ -272,8 +272,8 @@ export default function AdminReportsScreen() {
             <View 
               style={[styles.chartFill, { 
                 height: `${stats.attendanceRate}%`, 
-                backgroundColor: stats.attendanceRate >= 90 ? COLORS.chalk : 
-                               stats.attendanceRate >= 70 ? COLORS.pencil : 
+                backgroundColor: stats.attendanceRate >= 90 ? COLORS.success : 
+                               stats.attendanceRate >= 70 ? COLORS.primary : 
                                COLORS.danger 
               }]} 
             />
@@ -289,9 +289,9 @@ export default function AdminReportsScreen() {
             <View 
               style={[styles.chartFill, { 
                 height: `${stats.averageGrade}%`, 
-                backgroundColor: stats.averageGrade >= 90 ? COLORS.chalk : 
-                               stats.averageGrade >= 70 ? COLORS.pencil : 
-                               stats.averageGrade >= 50 ? COLORS.ink : 
+                backgroundColor: stats.averageGrade >= 90 ? COLORS.success : 
+                               stats.averageGrade >= 70 ? COLORS.primary : 
+                               stats.averageGrade >= 50 ? COLORS.text : 
                                COLORS.danger 
               }]} 
             />
@@ -334,10 +334,10 @@ export default function AdminReportsScreen() {
       <View style={styles.statusGrid}>
         {['present', 'absent', 'late', 'excused'].map(status => (
           <View key={status} style={styles.statusCard}>
-            <Text style={[styles.statusValue, { color: status === 'present' ? COLORS.chalk : 
+            <Text style={[styles.statusValue, {             color: status === 'present' ? COLORS.success : 
                                                status === 'absent' ? COLORS.danger : 
-                                               status === 'late' ? COLORS.pencil : 
-                                               COLORS.graphite }]}>
+                                               status === 'late' ? COLORS.primary : 
+                                               COLORS.textSecondary }]}>
               {attendanceReport.statusCounts[status] || 0}
             </Text>
             <Text style={styles.statusLabel}>{status.charAt(0).toUpperCase() + status.slice(1)}</Text>
@@ -447,8 +447,8 @@ export default function AdminReportsScreen() {
                 
                 <View style={styles.studentStat}>
                   <Text style={[styles.statValue, { 
-                    color: item.attendanceRate >= 90 ? COLORS.chalk : 
-                           item.attendanceRate >= 70 ? COLORS.pencil : 
+                    color: item.attendanceRate >= 90 ? COLORS.success : 
+                           item.attendanceRate >= 70 ? COLORS.primary : 
                            COLORS.danger 
                   }]}>
                     {item.attendanceRate.toFixed(1)}%
@@ -458,9 +458,9 @@ export default function AdminReportsScreen() {
                 
                 <View style={styles.studentStat}>
                   <Text style={[styles.statValue, { 
-                    color: item.averageGrade >= 90 ? COLORS.chalk : 
-                           item.averageGrade >= 70 ? COLORS.pencil : 
-                           item.averageGrade >= 50 ? COLORS.ink : 
+                    color: item.averageGrade >= 90 ? COLORS.success : 
+                           item.averageGrade >= 70 ? COLORS.primary : 
+                           item.averageGrade >= 50 ? COLORS.text : 
                            COLORS.danger 
                   }]}>
                     {(item.averageGrade || 0).toFixed(1)}%
@@ -534,7 +534,7 @@ export default function AdminReportsScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
       ) : errorMsg ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{errorMsg}</Text>
@@ -557,13 +557,13 @@ export default function AdminReportsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 20,
   },
   filterSection: {
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   filterLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 12,
   },
   schoolSelector: {
@@ -584,24 +584,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   schoolOptionSelected: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   schoolOptionText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontWeight: '500',
   },
   schoolOptionTextSelected: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   clearFilterButton: {
-    backgroundColor: COLORS.graphite,
+    backgroundColor: COLORS.textSecondary,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 6,
@@ -609,12 +609,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   clearFilterText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 4,
     marginBottom: 20,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   tabButtonActive: {
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -634,11 +634,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tabButtonText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   tabButtonTextActive: {
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   tabContent: {
     flex: 1,
@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
   tabTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 16,
   },
   statsGrid: {
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -666,12 +666,12 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   chartSection: {
     marginBottom: 24,
@@ -679,12 +679,12 @@ const styles = StyleSheet.create({
   chartTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 12,
   },
   chartBarContainer: {
     height: 60,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 8,
     alignItems: 'center',
@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
   chartBar: {
     width: '100%',
     height: 40,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderRadius: 4,
     justifyContent: 'flex-end',
     padding: 4,
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
   chartLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginTop: 8,
   },
   recentSection: {
@@ -714,18 +714,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 12,
   },
   activityItem: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 6,
     padding: 12,
     marginBottom: 8,
   },
   activityText: {
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   statusGrid: {
     flexDirection: 'row',
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statusCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
@@ -748,7 +748,7 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     textTransform: 'capitalize',
   },
   termSection: {
@@ -757,12 +757,12 @@ const styles = StyleSheet.create({
   termTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 12,
     paddingLeft: 16,
   },
   recordCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 6,
     padding: 12,
     marginBottom: 8,
@@ -770,30 +770,30 @@ const styles = StyleSheet.create({
   },
   recordText: {
     fontSize: 14,
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   studentCard: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.pencil,
+    borderLeftColor: COLORS.primary,
   },
   studentName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   studentEmail: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   studentRole: {
     fontSize: 12,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginBottom: 12,
     textTransform: 'capitalize',
   },
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
   },
   studentStatLabel: {
     fontSize: 12,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   loader: {
@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 16,
@@ -829,11 +829,11 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     borderRadius: 6,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -841,7 +841,7 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },

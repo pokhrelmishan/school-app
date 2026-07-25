@@ -124,15 +124,15 @@ export default function ParentAttendanceScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'present':
-        return COLORS.chalk;
+        return COLORS.success;
       case 'absent':
         return COLORS.danger;
       case 'late':
-        return COLORS.pencil;
+        return COLORS.primary;
       case 'excused':
-        return COLORS.graphite;
+        return COLORS.textSecondary;
       default:
-        return COLORS.ink;
+        return COLORS.text;
     }
   };
 
@@ -171,7 +171,7 @@ export default function ParentAttendanceScreen() {
       <Text style={styles.headerTitle}>Child's Attendance</Text>
 
       {loading && linkedStudents.length === 0 ? (
-        <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
       ) : linkedStudents.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No children linked to your account.</Text>
@@ -207,7 +207,7 @@ export default function ParentAttendanceScreen() {
                   <Text style={styles.statLabel}>Absent</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: COLORS.pencil }]}>{stats.late}</Text>
+                  <Text style={[styles.statValue, { color: COLORS.primary }]}>{stats.late}</Text>
                   <Text style={styles.statLabel}>Late</Text>
                 </View>
               </View>
@@ -247,7 +247,7 @@ export default function ParentAttendanceScreen() {
               </View>
 
               {loading ? (
-                <ActivityIndicator size="large" color={COLORS.chalk} style={styles.loader} />
+                <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
               ) : errorMsg ? (
                 <View style={styles.errorContainer}>
                   <Text style={styles.errorText}>{errorMsg}</Text>
@@ -300,13 +300,13 @@ export default function ParentAttendanceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bg,
     padding: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 16,
   },
   loader: {
@@ -317,13 +317,13 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     fontSize: 16,
     textAlign: 'center',
   },
   errorContainer: {
     padding: 16,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 16,
@@ -335,11 +335,11 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: COLORS.cover,
+    backgroundColor: COLORS.primaryDark,
     borderRadius: 6,
   },
   retryText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   studentSelector: {
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   selectorLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 12,
   },
   studentButtons: {
@@ -360,20 +360,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderWidth: 1,
-    borderColor: COLORS.line,
+    borderColor: COLORS.border,
   },
   studentButtonSelected: {
-    backgroundColor: COLORS.chalk,
-    borderColor: COLORS.chalk,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   studentButtonText: {
-    color: COLORS.ink,
+    color: COLORS.text,
     fontWeight: '500',
   },
   studentButtonTextSelected: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontWeight: '600',
   },
   statsContainer: {
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
@@ -392,44 +392,44 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   monthSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 12,
     marginBottom: 20,
   },
   monthButton: {
     padding: 8,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.surface,
     borderRadius: 4,
   },
   monthButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   monthText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.ink,
+    color: COLORS.text,
   },
   card: {
-    backgroundColor: COLORS.paperDim,
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 8,
     padding: 14,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.cover,
+    borderLeftColor: COLORS.primaryDark,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -440,12 +440,12 @@ const styles = StyleSheet.create({
   className: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.ink,
+    color: COLORS.text,
     marginBottom: 4,
   },
   gradeLevel: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
   },
   badge: {
     paddingHorizontal: 10,
@@ -453,24 +453,24 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   badgeText: {
-    color: COLORS.paper,
+    color: COLORS.surface,
     fontSize: 12,
     fontWeight: 'bold',
   },
   dateText: {
     fontSize: 14,
-    color: COLORS.graphite,
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
   teacherText: {
     fontSize: 13,
-    color: COLORS.ink,
+    color: COLORS.text,
     marginTop: 4,
     fontStyle: 'italic',
   },
   notesText: {
     fontSize: 13,
-    color: COLORS.ink,
+    color: COLORS.text,
     marginTop: 4,
     fontStyle: 'italic',
   },

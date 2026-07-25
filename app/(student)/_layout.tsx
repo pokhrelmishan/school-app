@@ -1,76 +1,80 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import { COLORS } from '../../lib/theme';
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    Dashboard: '▦',
-    Attendance: '✓',
-    Grades: '★',
-    Assignments: '◎',
-    Notices: '◉',
-  };
+function TabIcon({ icon, focused }: { icon: string; focused: boolean }) {
   return (
-    <Text style={{ fontSize: 20, color: focused ? COLORS.pencil : COLORS.graphiteLight, opacity: focused ? 1 : 0.6 }}>
-      {icons[label] || '●'}
+    <Text style={[tabStyles.icon, focused && tabStyles.iconActive]}>
+      {icon}
     </Text>
   );
 }
+
+const tabStyles = StyleSheet.create({
+  icon: {
+    fontSize: 22,
+    opacity: 0.4,
+  },
+  iconActive: {
+    opacity: 1,
+  },
+});
 
 export default function StudentLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textTertiary,
         tabBarStyle: {
-          backgroundColor: COLORS.cover,
-          borderTopColor: COLORS.graphite,
-          borderTopWidth: 0.5,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
+          backgroundColor: COLORS.surface,
+          borderTopColor: COLORS.borderLight,
+          borderTopWidth: 1,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 8,
         },
-        tabBarActiveTintColor: COLORS.pencil,
-        tabBarInactiveTintColor: COLORS.graphiteLight,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
+          marginTop: 2,
         },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ focused }) => <TabIcon label="Dashboard" focused={focused} />,
+          title: 'Home',
+          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="attendance"
         options={{
           title: 'Attendance',
-          tabBarIcon: ({ focused }) => <TabIcon label="Attendance" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="📅" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="grades"
         options={{
           title: 'Grades',
-          tabBarIcon: ({ focused }) => <TabIcon label="Grades" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="📊" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="assignments"
         options={{
-          title: 'Assignments',
-          tabBarIcon: ({ focused }) => <TabIcon label="Assignments" focused={focused} />,
+          title: 'Tasks',
+          tabBarIcon: ({ focused }) => <TabIcon icon="📝" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="notices"
         options={{
           title: 'Notices',
-          tabBarIcon: ({ focused }) => <TabIcon label="Notices" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="🔔" focused={focused} />,
         }}
       />
     </Tabs>
