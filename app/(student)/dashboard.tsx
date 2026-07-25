@@ -80,9 +80,11 @@ export default function StudentDashboardScreen() {
           <Text style={styles.greeting}>{getGreeting()},</Text>
           <Text style={styles.name}>{profile?.full_name || 'Student'}</Text>
         </View>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(profile?.full_name || 'S')[0]}</Text>
-        </View>
+        <TouchableOpacity onPress={() => router.push('/(student)/profile')} activeOpacity={0.7}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{(profile?.full_name || 'S')[0]}</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Attendance Quick Stats */}

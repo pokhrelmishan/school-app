@@ -13,7 +13,7 @@ interface Class {
 }
 
 export default function TeacherClassesScreen() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -50,7 +50,20 @@ export default function TeacherClassesScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>My Classes</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Welcome,</Text>
+          <Text style={styles.headerTitle}>{profile?.full_name || 'Teacher'}</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/(teacher)/profile')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{(profile?.full_name || 'T')[0]}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
@@ -109,11 +122,32 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     padding: 16,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 16,
+    marginBottom: 24,
+  },
+  greeting: { fontSize: 15, color: COLORS.textSecondary, marginBottom: 4 },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: COLORS.text,
-    marginBottom: 16,
+    letterSpacing: -0.5,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   loader: {
     marginTop: 32,

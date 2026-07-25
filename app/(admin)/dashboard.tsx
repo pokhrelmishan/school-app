@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import { useRouter } from 'expo-router';
 
 interface School {
   id: string;
@@ -28,7 +29,8 @@ interface Class {
 }
 
 export default function AdminDashboardScreen() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const router = useRouter();
   const [schools, setSchools] = useState<School[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -256,6 +258,14 @@ export default function AdminDashboardScreen() {
             <Text style={styles.headerTitle}>{primarySchool?.name || 'Dashboard'}</Text>
             <Text style={styles.headerSubtitle}>Welcome back</Text>
           </View>
+          <TouchableOpacity
+            onPress={() => router.push('/(admin)/settings')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerAvatarText}>{(profile?.full_name || 'A')[0]}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -338,6 +348,21 @@ const styles = StyleSheet.create({
   headerLogoText: {
     fontSize: 22,
     fontWeight: '800',
+    color: COLORS.surface,
+  },
+  headerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.surface + '30',
+  },
+  headerAvatarText: {
+    fontSize: 18,
+    fontWeight: '700',
     color: COLORS.surface,
   },
   tabContainer: {

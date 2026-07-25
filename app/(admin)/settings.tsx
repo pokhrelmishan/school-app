@@ -12,7 +12,7 @@ interface School {
 }
 
 export default function AdminSettingsScreen() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [school, setSchool] = useState<School | null>(null);
   const [schoolName, setSchoolName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -284,6 +284,19 @@ export default function AdminSettingsScreen() {
             <Text style={styles.infoValue}>—</Text>
           </View>
         </View>
+
+        <Text style={styles.sectionLabel}>Account</Text>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={() => {
+            Alert.alert('Log Out', 'Are you sure you want to log out?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Log Out', style: 'destructive', onPress: () => logout() },
+            ]);
+          }}
+        >
+          <Text style={styles.logoutButtonText}>Log Out</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -477,5 +490,19 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.border,
     marginVertical: 4,
+  },
+  logoutButton: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.danger + '40',
+  },
+  logoutButtonText: {
+    color: COLORS.danger,
+    fontWeight: '700',
+    fontSize: 15,
   },
 });

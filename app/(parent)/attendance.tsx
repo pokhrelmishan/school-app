@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity }
 import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import { useRouter } from 'expo-router';
 
 interface Student {
   id: string;
@@ -28,7 +29,8 @@ interface AttendanceRecord {
 }
 
 export default function ParentAttendanceScreen() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const router = useRouter();
   const [linkedStudents, setLinkedStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -168,7 +170,14 @@ export default function ParentAttendanceScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>Child's Attendance</Text>
+      <View style={styles.topRow}>
+        <Text style={styles.headerTitle}>Child's Attendance</Text>
+        <TouchableOpacity onPress={() => router.push('/(parent)/profile')} activeOpacity={0.7}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{(profile?.full_name || 'P')[0]}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {loading && linkedStudents.length === 0 ? (
         <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
@@ -303,11 +312,29 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     padding: 16,
   },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 16,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   loader: {
     marginTop: 32,

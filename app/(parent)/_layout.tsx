@@ -11,16 +11,11 @@ function TabIcon({ icon, focused }: { icon: string; focused: boolean }) {
 }
 
 const tabStyles = StyleSheet.create({
-  icon: {
-    fontSize: 22,
-    opacity: 0.4,
-  },
-  iconActive: {
-    opacity: 1,
-  },
+  icon: { fontSize: 22, opacity: 0.4 },
+  iconActive: { opacity: 1 },
 });
 
-export default function StudentLayout() {
+export default function ParentLayout() {
   return (
     <Tabs
       screenOptions={{
@@ -43,13 +38,6 @@ export default function StudentLayout() {
       }}
     >
       <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
         name="attendance"
         options={{
           title: 'Attendance',
@@ -61,20 +49,6 @@ export default function StudentLayout() {
         options={{
           title: 'Grades',
           tabBarIcon: ({ focused }) => <TabIcon icon="📊" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="assignments"
-        options={{
-          title: 'Tasks',
-          tabBarIcon: ({ focused }) => <TabIcon icon="📝" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="notices"
-        options={{
-          title: 'Notices',
-          tabBarIcon: ({ focused }) => <TabIcon icon="🔔" focused={focused} />,
         }}
       />
       <Tabs.Screen
