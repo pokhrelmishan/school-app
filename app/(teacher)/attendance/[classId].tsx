@@ -31,8 +31,8 @@ export default function TeacherAttendanceScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [locked, setLocked] = useState<boolean>(false);
+  const selectedDate = new Date().toISOString().split('T')[0];
 
   const fetchStudentsAndAttendance = async () => {
     if (!classId) return;
@@ -40,7 +40,6 @@ export default function TeacherAttendanceScreen() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Fetch students enrolled in this class
       const { data: enrollments, error: enrollmentsError } = await supabase
         .from('class_enrollments')
         .select(`
@@ -61,7 +60,6 @@ export default function TeacherAttendanceScreen() {
       }).filter(Boolean) as Student[];
       setStudents(studentsList);
 
-      // Fetch existing attendance for today
       const { data: existingRecords, error: recordsError } = await supabase
         .from('attendance_records')
         .select('*')
@@ -73,12 +71,15 @@ export default function TeacherAttendanceScreen() {
         return;
       }
 
-      // Convert to record map for easy access
       const recordsMap: Record<string, AttendanceRecord> = {};
       existingRecords?.forEach(record => {
         recordsMap[record.student_id] = record;
       });
       setAttendanceRecords(recordsMap);
+
+      if (existingRecords && existingRecords.length > 0) {
+        setLocked(true);
+      }
 
     } catch (err: any) {
       setErrorMsg(err?.message || 'An error occurred fetching data');
@@ -88,6 +89,7 @@ export default function TeacherAttendanceScreen() {
   };
 
   const updateAttendanceStatus = (studentId: string, status: 'present' | 'absent' | 'late' | 'excused') => {
+    if (locked) return;
     const student = students.find(s => s.id === studentId);
     if (!student) return;
 
@@ -109,6 +111,7 @@ export default function TeacherAttendanceScreen() {
   };
 
   const updateNotes = (studentId: string, notes: string) => {
+    if (locked) return;
     const existingRecord = attendanceRecords[studentId];
     if (!existingRecord) return;
 
@@ -139,9 +142,7 @@ export default function TeacherAttendanceScreen() {
       if (error) {
         setErrorMsg(error.message);
       } else {
-        setSuccessMsg('Attendance saved!');
-        setTimeout(() => setSuccessMsg(null), 2000);
-        await fetchStudentsAndAttendance();
+        setLocked(true);
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'An error occurred saving attendance');
@@ -152,7 +153,7 @@ export default function TeacherAttendanceScreen() {
 
   useEffect(() => {
     fetchStudentsAndAttendance();
-  }, [classId, selectedDate]);
+  }, [classId]);
 
   return (
     <View style={styles.container}>
@@ -176,9 +177,9 @@ export default function TeacherAttendanceScreen() {
         </View>
       ) : (
         <>
-          {successMsg && (
-            <View style={styles.successBanner}>
-              <Text style={styles.successText}>{successMsg}</Text>
+          {locked && (
+            <View style={styles.lockedBanner}>
+              <Text style={styles.lockedText}>Attendance already marked for today</Text>
             </View>
           )}
           <FlatList
@@ -189,7 +190,7 @@ export default function TeacherAttendanceScreen() {
               const currentStatus = record?.status || 'present';
               
               return (
-                <View style={styles.studentCard}>
+                <View style={[styles.studentCard, locked && styles.studentCardLocked]}>
                   <View style={styles.studentInfo}>
                     <Text style={styles.studentName}>{item.full_name}</Text>
                     <Text style={styles.studentEmail}>{item.email}</Text>
@@ -201,11 +202,19 @@ export default function TeacherAttendanceScreen() {
                       {statusOptions.map(status => (
                         <TouchableOpacity
                           key={status}
-                          style={[styles.statusButton, currentStatus === status && styles.statusButtonSelected]}
+                          style={[
+                            styles.statusButton,
+                            currentStatus === status && styles.statusButtonSelected,
+                            locked && styles.statusButtonLocked,
+                          ]}
                           onPress={() => updateAttendanceStatus(item.id, status)}
+                          disabled={locked}
                         >
                           <Text 
-                            style={[styles.statusButtonText, currentStatus === status && styles.statusButtonTextSelected]}
+                            style={[
+                              styles.statusButtonText,
+                              currentStatus === status && styles.statusButtonTextSelected,
+                            ]}
                           >
                             {status.charAt(0).toUpperCase() + status.slice(1)}
                           </Text>
@@ -216,11 +225,12 @@ export default function TeacherAttendanceScreen() {
                   
                   <View style={styles.notesSection}>
                     <TextInput
-                      style={styles.notesInput}
+                      style={[styles.notesInput, locked && styles.notesInputLocked]}
                       value={record?.notes || ''}
                       onChangeText={(text) => updateNotes(item.id, text)}
-                      placeholder="Notes (optional)"
+                      placeholder={locked ? '' : 'Notes (optional)'}
                       multiline
+                      editable={!locked}
                     />
                   </View>
                 </View>
@@ -228,15 +238,17 @@ export default function TeacherAttendanceScreen() {
             }}
           />
           
-          <TouchableOpacity 
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-            onPress={saveAttendance}
-            disabled={saving}
-          >
-            <Text style={styles.saveButtonText}>
-              {saving ? 'Saving...' : 'Save All Attendance'}
-            </Text>
-          </TouchableOpacity>
+          {!locked && (
+            <TouchableOpacity 
+              style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+              onPress={saveAttendance}
+              disabled={saving}
+            >
+              <Text style={styles.saveButtonText}>
+                {saving ? 'Saving...' : 'Save Attendance'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </>
       )}
     </View>
@@ -286,6 +298,20 @@ const styles = StyleSheet.create({
     color: COLORS.paper,
     fontWeight: '600',
   },
+  lockedBanner: {
+    backgroundColor: COLORS.graphite + '15',
+    borderWidth: 1,
+    borderColor: COLORS.graphite + '30',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  lockedText: {
+    color: COLORS.graphite,
+    fontWeight: '700',
+    fontSize: 14,
+  },
   successBanner: {
     backgroundColor: COLORS.chalk + '20',
     borderWidth: 1,
@@ -316,6 +342,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderLeftWidth: 4,
     borderLeftColor: COLORS.pencil,
+  },
+  studentCardLocked: {
+    opacity: 0.7,
   },
   studentInfo: {
     marginBottom: 16,
@@ -356,6 +385,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.chalk,
     borderColor: COLORS.chalk,
   },
+  statusButtonLocked: {
+    opacity: 0.6,
+  },
   statusButtonText: {
     color: COLORS.ink,
     fontSize: 12,
@@ -375,6 +407,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.paper,
     textAlignVertical: 'top',
     minHeight: 60,
+  },
+  notesInputLocked: {
+    backgroundColor: COLORS.paperDim,
   },
   saveButton: {
     backgroundColor: COLORS.chalk,
