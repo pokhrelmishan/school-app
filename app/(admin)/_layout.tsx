@@ -8,6 +8,7 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
     Users: '♟',
     Classes: '▤',
     Reports: '◈',
+    Settings: '⚙',
     Seed: '✦',
   };
   return (
@@ -64,6 +65,13 @@ export default function AdminLayout() {
         options={{
           title: 'Reports',
           tabBarIcon: ({ focused }) => <TabIcon label="Reports" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ focused }) => <TabIcon label="Settings" focused={focused} />,
         }}
       />
       <Tabs.Screen

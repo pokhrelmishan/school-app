@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth';
 interface School {
   id: string;
   name: string;
+  logo_url: string | null;
   created_at: string;
 }
 
@@ -43,7 +44,7 @@ export default function AdminDashboardScreen() {
 
       const { data: schoolsData, error: schoolsError } = await supabase
         .from('schools')
-        .select('*')
+        .select('id, name, logo_url, created_at')
         .order('name');
 
       const { data: profilesData, error: profilesError } = await supabase
@@ -238,11 +239,24 @@ export default function AdminDashboardScreen() {
 
   const getRoleDisplay = (role: string) => role.charAt(0).toUpperCase() + role.slice(1);
 
+  const primarySchool = schools[0];
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-        <Text style={styles.headerSubtitle}>Welcome back</Text>
+        <View style={styles.headerRow}>
+          {primarySchool?.logo_url ? (
+            <Image source={{ uri: primarySchool.logo_url }} style={styles.headerLogo} />
+          ) : (
+            <View style={styles.headerLogoPlaceholder}>
+              <Text style={styles.headerLogoText}>{primarySchool?.name?.charAt(0) || 'E'}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>{primarySchool?.name || 'Dashboard'}</Text>
+            <Text style={styles.headerSubtitle}>Welcome back</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.tabContainer}>
@@ -300,6 +314,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.graphiteLight,
     marginTop: 4,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  headerLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.graphite,
+  },
+  headerLogoPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.chalk,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerLogoText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.paper,
   },
   tabContainer: {
     flexDirection: 'row',
