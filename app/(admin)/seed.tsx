@@ -1,242 +1,139 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../lib/theme';
 
+interface Counts {
+  teachers: number;
+  students: number;
+  parents: number;
+  classes: number;
+  enrollments: number;
+  attendance: number;
+  grades: number;
+}
+
 export default function AdminSeedScreen() {
-  const [loading, setLoading] = useState(false);
-  const [seedData, setSeedData] = useState({
-    schoolName: 'Elmwood Academy',
-    adminEmail: 'admin@elmwood.demo',
-    adminPassword: 'password123',
-    teacherEmails: ['teacher1@elmwood.demo', 'teacher2@elmwood.demo'],
-    teacherPasswords: ['password123', 'password123'],
-    studentEmails: [
-      'student1@elmwood.demo',
-      'student2@elmwood.demo',
-      'student3@elmwood.demo',
-      'student4@elmwood.demo',
-      'student5@elmwood.demo'
-    ],
-    studentPasswords: ['password123', 'password123', 'password123', 'password123', 'password123'],
-    parentEmails: ['parent1@elmwood.demo', 'parent2@elmwood.demo'],
-    parentPasswords: ['password123', 'password123']
-  });
+  const [counts, setCounts] = useState<Counts | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const generateUUID = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c == 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  };
-
-  const seedDatabase = async () => {
+  const fetchCounts = async () => {
     setLoading(true);
     try {
-      // First, create the school
-      const { data: school, error: schoolError } = await supabase
-        .from('schools')
-        .insert({
-          id: generateUUID(),
-          name: seedData.schoolName,
-        })
-        .select()
-        .single();
-
-      if (schoolError) throw schoolError;
-
-      // Create admin user
-      const { data: adminUser, error: adminAuthError } = await supabase.auth.signUp({
-        email: seedData.adminEmail,
-        password: seedData.adminPassword,
+      const [teachers, students, parents, classes, enrollments, attendance, grades] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'teacher'),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'parent'),
+        supabase.from('classes').select('*', { count: 'exact', head: true }),
+        supabase.from('class_enrollments').select('*', { count: 'exact', head: true }),
+        supabase.from('attendance_records').select('*', { count: 'exact', head: true }),
+        supabase.from('grade_entries').select('*', { count: 'exact', head: true }),
+      ]);
+      setCounts({
+        teachers: teachers.count || 0,
+        students: students.count || 0,
+        parents: parents.count || 0,
+        classes: classes.count || 0,
+        enrollments: enrollments.count || 0,
+        attendance: attendance.count || 0,
+        grades: grades.count || 0,
       });
-
-      if (adminAuthError) throw adminAuthError;
-
-      if (adminUser.user) {
-        // Create admin profile
-        const { error: adminProfileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: adminUser.user.id,
-            school_id: school.id,
-            role: 'admin',
-            full_name: 'Admin User',
-            email: seedData.adminEmail,
-          });
-
-        if (adminProfileError) throw adminProfileError;
-      }
-
-      // Create teachers
-      const teacherProfiles: { id: string; full_name: string }[] = [];
-      for (let i = 0; i < seedData.teacherEmails.length; i++) {
-        const { data: teacherUser, error: teacherAuthError } = await supabase.auth.signUp({
-          email: seedData.teacherEmails[i],
-          password: seedData.teacherPasswords[i],
-        });
-
-        if (teacherAuthError) throw teacherAuthError;
-
-        if (teacherUser.user) {
-          const fullName = `Teacher ${i + 1}`;
-          const { error: teacherProfileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: teacherUser.user.id,
-              school_id: school.id,
-              role: 'teacher',
-              full_name: fullName,
-              email: seedData.teacherEmails[i],
-            });
-
-          if (teacherProfileError) throw teacherProfileError;
-
-          teacherProfiles.push({ id: teacherUser.user.id, full_name: fullName });
-        }
-      }
-
-      // Create classes, one per teacher
-      const classIds: string[] = [];
-      for (let i = 0; i < teacherProfiles.length; i++) {
-        const classId = generateUUID();
-        const { error: classError } = await supabase
-          .from('classes')
-          .insert({
-            id: classId,
-            school_id: school.id,
-            name: `Class ${i + 1}`,
-            grade_level: `${i + 5}th Grade`,
-            teacher_id: teacherProfiles[i].id,
-          });
-
-        if (classError) throw classError;
-        classIds.push(classId);
-      }
-
-      // Create students, split evenly across classes
-      const studentProfiles: { id: string; full_name: string }[] = [];
-      for (let i = 0; i < seedData.studentEmails.length; i++) {
-        const { data: studentUser, error: studentAuthError } = await supabase.auth.signUp({
-          email: seedData.studentEmails[i],
-          password: seedData.studentPasswords[i],
-        });
-
-        if (studentAuthError) throw studentAuthError;
-
-        if (studentUser.user) {
-          const fullName = `Student ${i + 1}`;
-          const { error: studentProfileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: studentUser.user.id,
-              school_id: school.id,
-              role: 'student',
-              full_name: fullName,
-              email: seedData.studentEmails[i],
-            });
-
-          if (studentProfileError) throw studentProfileError;
-
-          studentProfiles.push({ id: studentUser.user.id, full_name: fullName });
-
-          // Enroll the student into a class (round-robin across available classes)
-          if (classIds.length > 0) {
-            const assignedClassId = classIds[i % classIds.length];
-            const { error: enrollmentError } = await supabase
-              .from('class_enrollments')
-              .insert({
-                class_id: assignedClassId,
-                student_id: studentUser.user.id,
-              });
-
-            if (enrollmentError) throw enrollmentError;
-          }
-        }
-      }
-
-      // Create parents, each linked to one student
-      for (let i = 0; i < seedData.parentEmails.length; i++) {
-        const { data: parentUser, error: parentAuthError } = await supabase.auth.signUp({
-          email: seedData.parentEmails[i],
-          password: seedData.parentPasswords[i],
-        });
-
-        if (parentAuthError) throw parentAuthError;
-
-        if (parentUser.user) {
-          const { error: parentProfileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: parentUser.user.id,
-              school_id: school.id,
-              role: 'parent',
-              full_name: `Parent ${i + 1}`,
-              email: seedData.parentEmails[i],
-            });
-
-          if (parentProfileError) throw parentProfileError;
-
-          // Link this parent to a student (round-robin, if any students exist)
-          if (studentProfiles.length > 0) {
-            const linkedStudent = studentProfiles[i % studentProfiles.length];
-            const { error: linkError } = await supabase
-              .from('parent_students')
-              .insert({
-                parent_id: parentUser.user.id,
-                student_id: linkedStudent.id,
-              });
-
-            if (linkError) throw linkError;
-          }
-        }
-      }
-
-      Alert.alert('Success', 'Demo data has been created successfully.');
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'An error occurred while seeding data');
+    } catch {
+      // counts stay null
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Seed Demo Data</Text>
-      <Text style={styles.description}>
-        This creates a demo school with one admin, {seedData.teacherEmails.length} teachers,{' '}
-        {seedData.studentEmails.length} students, and {seedData.parentEmails.length} parents,
-        along with classes, enrollments, and parent-child links.
-      </Text>
+  useEffect(() => { fetchCounts(); }, []);
 
-      <View style={styles.field}>
-        <Text style={styles.label}>School Name</Text>
-        <TextInput
-          style={styles.input}
-          value={seedData.schoolName}
-          onChangeText={(text) => setSeedData({ ...seedData, schoolName: text })}
-        />
+  const isSeeded = counts && counts.students > 0;
+
+  const CountRow = ({ label, value }: { label: string; value: number }) => (
+    <View style={styles.countRow}>
+      <Text style={styles.countLabel}>{label}</Text>
+      <View style={styles.countBadge}>
+        <Text style={styles.countValue}>{value}</Text>
       </View>
-
-      <View style={styles.field}>
-        <Text style={styles.label}>Admin Email</Text>
-        <TextInput
-          style={styles.input}
-          value={seedData.adminEmail}
-          onChangeText={(text) => setSeedData({ ...seedData, adminEmail: text })}
-          autoCapitalize="none"
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={seedDatabase}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>{loading ? 'Seeding...' : 'Seed Database'}</Text>
-      </TouchableOpacity>
     </View>
+  );
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Seed Data</Text>
+      </View>
+
+      <View style={styles.content}>
+        {loading ? (
+          <ActivityIndicator size="large" color={COLORS.chalk} style={{ marginTop: 32 }} />
+        ) : isSeeded ? (
+          <>
+            <View style={styles.statusCard}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>Demo data is loaded</Text>
+            </View>
+
+            <Text style={styles.sectionLabel}>Database</Text>
+            <View style={styles.countsCard}>
+              <CountRow label="Teachers" value={counts!.teachers} />
+              <View style={styles.divider} />
+              <CountRow label="Students" value={counts!.students} />
+              <View style={styles.divider} />
+              <CountRow label="Parents" value={counts!.parents} />
+              <View style={styles.divider} />
+              <CountRow label="Classes" value={counts!.classes} />
+              <View style={styles.divider} />
+              <CountRow label="Enrollments" value={counts!.enrollments} />
+              <View style={styles.divider} />
+              <CountRow label="Attendance Records" value={counts!.attendance} />
+              <View style={styles.divider} />
+              <CountRow label="Grade Entries" value={counts!.grades} />
+            </View>
+
+            <Text style={styles.sectionLabel}>Demo Accounts</Text>
+            <Text style={styles.hint}>All passwords: password123</Text>
+            <View style={styles.accountsCard}>
+              <Text style={styles.accountRole}>Teachers</Text>
+              <Text style={styles.accountEmail}>sarah.jones@edify.demo</Text>
+              <Text style={styles.accountEmail}>james.wilson@edify.demo</Text>
+              <View style={styles.accountDivider} />
+              <Text style={styles.accountRole}>Students</Text>
+              <Text style={styles.accountEmail}>aisha.patel@edify.demo</Text>
+              <Text style={styles.accountEmail}>omar.hassan@edify.demo</Text>
+              <Text style={styles.accountEmail}>lily.chen@edify.demo</Text>
+              <Text style={styles.accountEmail}>rajan.sharma@edify.demo</Text>
+              <Text style={styles.accountEmail}>emma.brown@edify.demo</Text>
+              <View style={styles.accountDivider} />
+              <Text style={styles.accountRole}>Parents</Text>
+              <Text style={styles.accountEmail}>priya.patel@edify.demo</Text>
+              <Text style={styles.accountEmail}>yusuf.hassan@edify.demo</Text>
+            </View>
+
+            <TouchableOpacity style={styles.refreshButton} onPress={fetchCounts}>
+              <Text style={styles.refreshText}>Refresh</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No demo data yet</Text>
+              <Text style={styles.emptyText}>
+                Run the seed script in Supabase SQL Editor to populate demo users, classes, attendance, and grades.
+              </Text>
+              <Text style={styles.emptyStep}>1. Go to Supabase Dashboard {'\u2192'} SQL Editor</Text>
+              <Text style={styles.emptyStep}>2. Paste the contents of supabase/seed.sql</Text>
+              <Text style={styles.emptyStep}>3. Click Run</Text>
+              <Text style={styles.emptyStep}>4. Come back and tap Refresh below</Text>
+            </View>
+
+            <TouchableOpacity style={styles.refreshButton} onPress={fetchCounts}>
+              <Text style={styles.refreshText}>Refresh</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -244,51 +141,151 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.paper,
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.cover,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.paper,
+    letterSpacing: -0.5,
+  },
+  content: {
     padding: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-    marginBottom: 12,
+  statusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.chalk + '15',
+    borderWidth: 1,
+    borderColor: COLORS.chalk + '30',
+    borderRadius: 10,
+    padding: 14,
+    gap: 10,
   },
-  description: {
-    fontSize: 14,
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.chalk,
+  },
+  statusText: {
+    color: COLORS.chalk,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
     color: COLORS.graphite,
-    marginBottom: 24,
-    lineHeight: 20,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginTop: 24,
+    marginBottom: 10,
   },
-  field: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.ink,
-    marginBottom: 6,
-  },
-  input: {
+  countsCard: {
     backgroundColor: COLORS.paperDim,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: COLORS.line,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+  },
+  countRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  countLabel: {
+    fontSize: 15,
     color: COLORS.ink,
   },
-  button: {
-    backgroundColor: COLORS.chalk,
+  countBadge: {
+    backgroundColor: COLORS.pencil + '20',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  countValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.pencil,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.line,
+  },
+  hint: {
+    fontSize: 13,
+    color: COLORS.graphite,
+    marginBottom: 10,
+  },
+  accountsCard: {
+    backgroundColor: COLORS.paperDim,
+    borderRadius: 12,
     padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  accountRole: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.graphite,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+    marginTop: 8,
+  },
+  accountEmail: {
+    fontSize: 14,
+    color: COLORS.ink,
+    fontFamily: 'Courier',
+    marginBottom: 2,
+  },
+  accountDivider: {
+    height: 1,
+    backgroundColor: COLORS.line,
+    marginVertical: 8,
+  },
+  emptyCard: {
+    backgroundColor: COLORS.paperDim,
+    borderRadius: 12,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.ink,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.graphite,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  emptyStep: {
+    fontSize: 14,
+    color: COLORS.ink,
+    marginBottom: 6,
+    paddingLeft: 8,
+  },
+  refreshButton: {
+    backgroundColor: COLORS.chalk,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 20,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
+  refreshText: {
     color: COLORS.paper,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });
