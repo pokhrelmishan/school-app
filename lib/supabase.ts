@@ -3,14 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-let wsTransport: any = undefined;
-if (Platform.OS === 'web') {
-  try {
-    const ws = require('ws');
-    wsTransport = ws.default || ws;
-  } catch {}
-}
-
 const ExpoSecureStoreAdapter = {
   getItem: (key: string) => {
     if (Platform.OS === 'web') {
@@ -50,8 +42,5 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-  },
-  realtime: {
-    ...(wsTransport ? { transport: wsTransport } : {}),
   },
 });
