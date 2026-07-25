@@ -22,7 +22,6 @@ function AuthGate() {
       const routes: Record<string, string> = {
         admin: '/(admin)/dashboard',
         teacher: '/(teacher)/classes',
-        parent: '/(parent)/attendance',
         student: '/(student)/dashboard',
       };
       const target = routes[profile.role];
