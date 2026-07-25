@@ -28,13 +28,18 @@ export default function StudentProfileScreen() {
 
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Role</Text>
-            <Text style={styles.infoValue}>{profile?.role}</Text>
+            <Text style={styles.infoLabel}>Grade</Text>
+            <Text style={styles.infoValue}>{profile?.grade_level || '—'}</Text>
           </View>
           <View style={styles.infoDivider} />
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>School ID</Text>
-            <Text style={styles.infoValueMono}>{profile?.school_id?.slice(0, 8)}...</Text>
+            <Text style={styles.infoLabel}>Roll No.</Text>
+            <Text style={styles.infoValueMono}>{profile?.roll_number || '—'}</Text>
+          </View>
+          <View style={styles.infoDivider} />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>House</Text>
+            <Text style={styles.infoValue}>{profile?.house || '—'}</Text>
           </View>
         </View>
 

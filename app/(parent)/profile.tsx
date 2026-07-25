@@ -31,11 +31,6 @@ export default function ParentProfileScreen() {
             <Text style={styles.infoLabel}>Role</Text>
             <Text style={styles.infoValue}>{profile?.role}</Text>
           </View>
-          <View style={styles.infoDivider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>School ID</Text>
-            <Text style={styles.infoValueMono}>{profile?.school_id?.slice(0, 8)}...</Text>
-          </View>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

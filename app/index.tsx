@@ -12,6 +12,9 @@ export default function Dashboard() {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<string>('admin');
   const [schoolName, setSchoolName] = useState('Elmwood Academy');
+  const [gradeLevel, setGradeLevel] = useState('');
+  const [rollNumber, setRollNumber] = useState('');
+  const [house, setHouse] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,13 +65,20 @@ export default function Dashboard() {
         return;
       }
 
-      const { error: profileErr } = await supabase.from('profiles').insert({
+      const profileData: Record<string, any> = {
         id: user.id,
         school_id: schoolId,
         role: selectedRole,
         full_name: user.email?.split('@')[0] ?? 'User',
         email: user.email ?? '',
-      });
+      };
+      if (selectedRole === 'student') {
+        if (gradeLevel.trim()) profileData.grade_level = gradeLevel.trim();
+        if (rollNumber.trim()) profileData.roll_number = rollNumber.trim();
+        if (house.trim()) profileData.house = house.trim();
+      }
+
+      const { error: profileErr } = await supabase.from('profiles').insert(profileData);
 
       if (profileErr) {
         setError('Profile creation failed: ' + profileErr.message);
@@ -124,6 +134,38 @@ export default function Dashboard() {
             ))}
           </View>
         </View>
+
+        {selectedRole === 'student' && (
+          <>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Grade Level</Text>
+              <TextInput
+                style={styles.input}
+                value={gradeLevel}
+                onChangeText={setGradeLevel}
+                placeholder="e.g. 10"
+              />
+            </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Roll Number</Text>
+              <TextInput
+                style={styles.input}
+                value={rollNumber}
+                onChangeText={setRollNumber}
+                placeholder="e.g. 042"
+              />
+            </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>House</Text>
+              <TextInput
+                style={styles.input}
+                value={house}
+                onChangeText={setHouse}
+                placeholder="e.g. Red"
+              />
+            </View>
+          </>
+        )}
 
         {error && (
           <View style={styles.errorBox}>

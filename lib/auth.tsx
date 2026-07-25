@@ -5,7 +5,7 @@ import type { User } from '@supabase/supabase-js';
 interface AuthState {
   user: User | null;
   loading: boolean;
-  profile: { role: string; school_id: string; full_name?: string } | null;
+  profile: { role: string; school_id: string; full_name?: string; grade_level?: string; roll_number?: string; house?: string } | null;
 }
 
 interface AuthContextValue extends AuthState {
@@ -18,12 +18,12 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ role: string; school_id: string; full_name?: string } | null>(null);
+  const [profile, setProfile] = useState<{ role: string; school_id: string; full_name?: string; grade_level?: string; roll_number?: string; house?: string } | null>(null);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('role, school_id, full_name')
+      .select('role, school_id, full_name, grade_level, roll_number, house')
       .eq('id', userId)
       .single();
     setProfile(data ?? null);
