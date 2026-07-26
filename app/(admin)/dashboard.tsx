@@ -9,16 +9,19 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import {
-  PageHeader,
+  ScreenHeader,
+  NotebookCard,
+  PaperCard,
   StatCard,
-  Card,
   Badge,
   EmptyState,
   LoadingScreen,
   Avatar,
+  QuickCard,
+  SectionHeader,
 } from '../../lib/components';
 
 interface RecentUser {
@@ -36,27 +39,17 @@ interface UpcomingEvent {
 }
 
 const QUICK_ACCESS = [
-  { emoji: '👥', label: 'Users', route: '/(admin)/users' as const },
-  { emoji: '📚', label: 'Classes', route: '/(admin)/classes' as const },
-  { emoji: '📖', label: 'Subjects', route: '/(admin)/subjects' as const },
-  { emoji: '🗓️', label: 'Timetable', route: '/(admin)/timetable' as const },
-  { emoji: '📝', label: 'Exams', route: '/(admin)/exams' as const },
-  { emoji: '💰', label: 'Fees', route: '/(admin)/fees' as const },
-  { emoji: '📅', label: 'Events', route: '/(admin)/events' as const },
-  { emoji: '📢', label: 'Announcements', route: '/(admin)/announcements' as const },
-  { emoji: '⚙️', label: 'Settings', route: '/(admin)/settings' as const },
-  { emoji: '👤', label: 'Profile', route: '/(admin)/profile' as const },
+  { icon: '\u{1F465}', label: 'Users', route: '/(admin)/users' as const, color: COLORS.chalk, bg: COLORS.chalkSoft },
+  { icon: '\u{1F4DA}', label: 'Classes', route: '/(admin)/classes' as const, color: COLORS.tape, bg: COLORS.dangerBg },
+  { icon: '\u{1F4D6}', label: 'Subjects', route: '/(admin)/subjects' as const, color: COLORS.blue, bg: COLORS.blueBg },
+  { icon: '\u{1F4C5}', label: 'Timetable', route: '/(admin)/timetable' as const, color: COLORS.pencil, bg: COLORS.warningBg },
+  { icon: '\u{1F4DD}', label: 'Exams', route: '/(admin)/exams' as const, color: COLORS.tape, bg: COLORS.dangerBg },
+  { icon: '\u{1F4B0}', label: 'Fees', route: '/(admin)/fees' as const, color: COLORS.chalk, bg: COLORS.chalkSoft },
+  { icon: '\u{1F4C6}', label: 'Events', route: '/(admin)/events' as const, color: COLORS.blue, bg: COLORS.blueBg },
+  { icon: '\u{1F4E2}', label: 'Announcements', route: '/(admin)/announcements' as const, color: COLORS.pencil, bg: COLORS.warningBg },
+  { icon: '\u{2699}\uFE0F', label: 'Settings', route: '/(admin)/settings' as const, color: COLORS.graphite, bg: COLORS.surfaceAlt },
+  { icon: '\u{1F464}', label: 'Profile', route: '/(admin)/profile' as const, color: COLORS.chalk, bg: COLORS.chalkSoft },
 ];
-
-function formatToday(): string {
-  const d = new Date();
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 function formatShortDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -71,10 +64,10 @@ function formatCurrency(amount: number): string {
 
 function getRoleColor(role: string): string {
   switch (role) {
-    case 'teacher': return COLORS.primary;
-    case 'student': return COLORS.success;
-    case 'admin': return COLORS.warning;
-    default: return COLORS.textSecondary;
+    case 'teacher': return COLORS.chalk;
+    case 'student': return COLORS.blue;
+    case 'admin': return COLORS.tape;
+    default: return COLORS.graphite;
   }
 }
 
@@ -112,52 +105,15 @@ export default function AdminDashboard() {
       usersRes,
       upcomingRes,
     ] = await Promise.all([
-      supabase
-        .from('schools')
-        .select('name')
-        .eq('id', profile.school_id)
-        .single(),
-      supabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('school_id', profile.school_id)
-        .eq('role', 'teacher'),
-      supabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('school_id', profile.school_id)
-        .eq('role', 'student'),
-      supabase
-        .from('classes')
-        .select('id', { count: 'exact', head: true })
-        .eq('school_id', profile.school_id),
-      supabase
-        .from('subjects')
-        .select('id', { count: 'exact', head: true })
-        .eq('school_id', profile.school_id),
-      supabase
-        .from('fee_payments')
-        .select('amount')
-        .eq('school_id', profile.school_id),
-      supabase
-        .from('school_events')
-        .select('id', { count: 'exact', head: true })
-        .eq('school_id', profile.school_id)
-        .gte('event_date', monthStart)
-        .lte('event_date', monthEnd),
-      supabase
-        .from('profiles')
-        .select('id, full_name, role, created_at')
-        .eq('school_id', profile.school_id)
-        .order('created_at', { ascending: false })
-        .limit(5),
-      supabase
-        .from('school_events')
-        .select('id, title, event_date, event_type')
-        .eq('school_id', profile.school_id)
-        .gte('event_date', now.toISOString())
-        .order('event_date', { ascending: true })
-        .limit(3),
+      supabase.from('schools').select('name').eq('id', profile.school_id).single(),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id).eq('role', 'teacher'),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id).eq('role', 'student'),
+      supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id),
+      supabase.from('subjects').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id),
+      supabase.from('fee_payments').select('amount_paid').eq('school_id', profile.school_id),
+      supabase.from('school_events').select('id', { count: 'exact', head: true }).eq('school_id', profile.school_id).gte('event_date', monthStart).lte('event_date', monthEnd),
+      supabase.from('profiles').select('id, full_name, role, created_at').eq('school_id', profile.school_id).order('created_at', { ascending: false }).limit(5),
+      supabase.from('school_events').select('id, title, event_date, event_type').eq('school_id', profile.school_id).gte('event_date', now.toISOString()).order('event_date', { ascending: true }).limit(3),
     ]);
 
     if (schoolRes.data) setSchoolName(schoolRes.data.name);
@@ -168,10 +124,9 @@ export default function AdminDashboard() {
     setEventsCount(monthEventsRes.count ?? 0);
 
     if (feesRes.data) {
-      const total = feesRes.data.reduce((sum: number, p: any) => sum + (p.amount ?? 0), 0);
+      const total = feesRes.data.reduce((sum: number, p: any) => sum + (p.amount_paid ?? 0), 0);
       setTotalFees(total);
     }
-
     if (usersRes.data) setRecentUsers(usersRes.data);
     if (upcomingRes.data) setUpcomingEvents(upcomingRes.data);
   }, [profile?.school_id]);
@@ -191,277 +146,181 @@ export default function AdminDashboard() {
     setRefreshing(false);
   }, [fetchData]);
 
-  if (loading) {
-    return <LoadingScreen text="Loading dashboard..." />;
-  }
+  if (loading) return <LoadingScreen text="Loading dashboard..." />;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={COLORS.primary}
-          colors={[COLORS.primary]}
-        />
-      }
-    >
-      {/* ── Greeting ──────────────────────────── */}
-      <View style={styles.greetingRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>
-            Welcome, {profile?.full_name?.split(' ')[0] || 'Admin'} 👋
-          </Text>
-          {schoolName ? (
-            <Text style={styles.schoolName}>{schoolName}</Text>
-          ) : null}
-          <Text style={styles.dateText}>{formatToday()}</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/(admin)/profile' as any)}
-          activeOpacity={0.7}
-        >
-          <Avatar name={profile?.full_name || 'A'} size={52} />
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Stats Grid (2×3) ────────────────── */}
-      <Text style={styles.sectionTitle}>Overview</Text>
-      <View style={styles.statsGrid}>
-        <View style={styles.statHalf}>
-          <StatCard icon="👨‍🏫" label="Teachers" value={teacherCount} color={COLORS.primary} />
-        </View>
-        <View style={styles.statHalf}>
-          <StatCard icon="👨‍🎓" label="Students" value={studentCount} color={COLORS.success} />
-        </View>
-        <View style={styles.statHalf}>
-          <StatCard icon="📚" label="Classes" value={classCount} color={COLORS.warning} />
-        </View>
-        <View style={styles.statHalf}>
-          <StatCard icon="📖" label="Subjects" value={subjectCount} color={COLORS.danger} />
-        </View>
-        <View style={styles.statHalf}>
-          <StatCard icon="💰" label="Fee Collection" value={formatCurrency(totalFees)} color="#8B5CF6" />
-        </View>
-        <View style={styles.statHalf}>
-          <StatCard icon="📅" label="Events This Month" value={eventsCount} color="#EC4899" />
-        </View>
-      </View>
-
-      {/* ── Quick Access ─────────────────────── */}
-      <Text style={styles.sectionTitle}>Quick Access</Text>
-      <View style={styles.quickGrid}>
-        {QUICK_ACCESS.map((item) => (
-          <TouchableOpacity
-            key={item.label}
-            style={styles.quickCard}
-            activeOpacity={0.7}
-            onPress={() => router.push(item.route as any)}
-          >
-            <Text style={styles.quickEmoji}>{item.emoji}</Text>
-            <Text style={styles.quickLabel}>{item.label}</Text>
+    <View style={styles.container}>
+      <ScreenHeader title="Admin Dashboard" subtitle={schoolName} />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} colors={[COLORS.cover]} />
+        }
+      >
+        <View style={styles.greetingRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greeting}>
+              Welcome, {profile?.full_name?.split(' ')[0] || 'Admin'}
+            </Text>
+            <Text style={styles.dateText}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => router.push('/(admin)/profile' as any)} activeOpacity={0.7}>
+            <Avatar name={profile?.full_name || 'A'} size={48} />
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      {/* ── Recent Registrations ─────────────── */}
-      <Text style={styles.sectionTitle}>Recent Registrations</Text>
-      <Card>
-        {recentUsers.length === 0 ? (
-          <EmptyState icon="👤" title="No registrations yet" subtitle="New users will appear here" />
-        ) : (
-          recentUsers.map((user, idx) => (
-            <View
-              key={user.id}
-              style={[styles.userRow, idx < recentUsers.length - 1 && styles.userRowBorder]}
-            >
-              <Avatar name={user.full_name} size={38} />
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{user.full_name}</Text>
-                <Badge text={user.role} color={getRoleColor(user.role)} />
-              </View>
-              <Text style={styles.userDate}>{formatShortDate(user.created_at)}</Text>
-            </View>
-          ))
-        )}
-      </Card>
+        <SectionHeader title="Overview" />
+        <View style={styles.statsGrid}>
+          <View style={styles.statHalf}>
+            <StatCard icon={'\u{1F468}\u200D\u{1F3EB}'} label="Teachers" value={teacherCount} color={COLORS.chalk} />
+          </View>
+          <View style={styles.statHalf}>
+            <StatCard icon={'\u{1F468}\u200D\u{1F393}'} label="Students" value={studentCount} color={COLORS.blue} />
+          </View>
+          <View style={styles.statHalf}>
+            <StatCard icon={'\u{1F4DA}'} label="Classes" value={classCount} color={COLORS.pencil} />
+          </View>
+          <View style={styles.statHalf}>
+            <StatCard icon={'\u{1F4D6}'} label="Subjects" value={subjectCount} color={COLORS.tape} />
+          </View>
+          <View style={styles.statHalf}>
+            <StatCard icon={'\u{1F4B0}'} label="Fee Collection" value={formatCurrency(totalFees)} color={COLORS.chalk} />
+          </View>
+          <View style={styles.statHalf}>
+            <StatCard icon={'\u{1F4C6}'} label="Events" value={eventsCount} color={COLORS.blue} />
+          </View>
+        </View>
 
-      {/* ── Upcoming Events ──────────────────── */}
-      <Text style={styles.sectionTitle}>Upcoming Events</Text>
-      <Card>
-        {upcomingEvents.length === 0 ? (
-          <EmptyState icon="📅" title="No upcoming events" subtitle="Events will show up here" />
-        ) : (
-          upcomingEvents.map((evt, idx) => (
-            <View
-              key={evt.id}
-              style={[styles.eventRow, idx < upcomingEvents.length - 1 && styles.userRowBorder]}
-            >
-              <View style={styles.eventDateBox}>
-                <Text style={styles.eventMonth}>
-                  {new Date(evt.event_date).toLocaleDateString('en-US', { month: 'short' })}
-                </Text>
-                <Text style={styles.eventDay}>
-                  {new Date(evt.event_date).getDate()}
-                </Text>
-              </View>
-              <View style={styles.eventInfo}>
-                <Text style={styles.eventTitle} numberOfLines={1}>{evt.title}</Text>
-                <Badge text={evt.event_type || 'Event'} color={COLORS.primary} />
-              </View>
-            </View>
-          ))
-        )}
-      </Card>
+        <SectionHeader title="Quick Access" />
+        <View style={styles.quickGrid}>
+          {QUICK_ACCESS.map((item) => (
+            <QuickCard
+              key={item.label}
+              icon={item.icon}
+              label={item.label}
+              color={item.color}
+              bg={item.bg}
+              onPress={() => router.push(item.route as any)}
+            />
+          ))}
+        </View>
 
-      <View style={{ height: 24 }} />
-    </ScrollView>
+        <SectionHeader title="Recent Registrations" />
+        <NotebookCard>
+          {recentUsers.length === 0 ? (
+            <EmptyState icon={'\u{1F464}'} title="No registrations yet" subtitle="New users will appear here" />
+          ) : (
+            recentUsers.map((user, idx) => (
+              <View key={user.id} style={[styles.userRow, idx < recentUsers.length - 1 && styles.divider]}>
+                <Avatar name={user.full_name} size={36} />
+                <View style={styles.userInfo}>
+                  <Text style={styles.userName}>{user.full_name}</Text>
+                  <Badge text={user.role} color={getRoleColor(user.role)} />
+                </View>
+                <Text style={styles.userDate}>{formatShortDate(user.created_at)}</Text>
+              </View>
+            ))
+          )}
+        </NotebookCard>
+
+        <SectionHeader title="Upcoming Events" />
+        <NotebookCard>
+          {upcomingEvents.length === 0 ? (
+            <EmptyState icon={'\u{1F4C6}'} title="No upcoming events" subtitle="Events will show up here" />
+          ) : (
+            upcomingEvents.map((evt, idx) => (
+              <View key={evt.id} style={[styles.eventRow, idx < upcomingEvents.length - 1 && styles.divider]}>
+                <View style={styles.dateBox}>
+                  <Text style={styles.dateMonth}>
+                    {new Date(evt.event_date).toLocaleDateString('en-US', { month: 'short' })}
+                  </Text>
+                  <Text style={styles.dateDay}>{new Date(evt.event_date).getDate()}</Text>
+                </View>
+                <View style={styles.eventInfo}>
+                  <Text style={styles.eventTitle} numberOfLines={1}>{evt.title}</Text>
+                  <Badge text={evt.event_type || 'Event'} color={COLORS.blue} />
+                </View>
+              </View>
+            ))
+          )}
+        </NotebookCard>
+
+        <View style={{ height: 24 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 32,
-  },
+  container: { flex: 1, backgroundColor: COLORS.paper },
+  scroll: { flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
 
-  /* Greeting */
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   greeting: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
-    color: COLORS.text,
-    letterSpacing: -0.5,
-  },
-  schoolName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginTop: 2,
+    color: COLORS.ink,
+    letterSpacing: -0.3,
   },
   dateText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 4,
+    fontSize: 12,
+    color: COLORS.graphite,
+    marginTop: 2,
   },
 
-  /* Section */
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 12,
-    marginTop: 4,
-  },
-
-  /* Stats 2×3 */
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 8,
   },
-  statHalf: {
-    width: '48%',
-    marginBottom: 10,
-  },
+  statHalf: { width: '48%', marginBottom: 8 },
 
-  /* Quick Access */
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  quickCard: {
-    width: '48%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-    alignItems: 'center',
-    ...SHADOWS.sm,
-  },
-  quickEmoji: {
-    fontSize: 28,
-    marginBottom: 6,
-  },
-  quickLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.text,
+    marginBottom: 8,
   },
 
-  /* User rows */
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
-  userRowBorder: {
+  divider: {
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
+    borderBottomColor: COLORS.line,
   },
-  userInfo: {
-    flex: 1,
-    marginLeft: 10,
-    gap: 4,
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  userDate: {
-    fontSize: 12,
-    color: COLORS.textTertiary,
-  },
+  userInfo: { flex: 1, marginLeft: 10, gap: 3 },
+  userName: { fontSize: 13, fontWeight: '600', color: COLORS.ink },
+  userDate: { fontSize: 11, color: COLORS.graphiteLight },
 
-  /* Event rows */
   eventRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
-  eventDateBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryBg,
+  dateBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: COLORS.chalkSoft,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
-  eventMonth: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-  },
-  eventDay: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.primary,
-    lineHeight: 22,
-  },
-  eventInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  eventTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
+  dateMonth: { fontSize: 9, fontWeight: '700', color: COLORS.chalk, textTransform: 'uppercase' },
+  dateDay: { fontSize: 16, fontWeight: '800', color: COLORS.chalk, lineHeight: 20 },
+  eventInfo: { flex: 1, gap: 3 },
+  eventTitle: { fontSize: 13, fontWeight: '600', color: COLORS.ink },
 });

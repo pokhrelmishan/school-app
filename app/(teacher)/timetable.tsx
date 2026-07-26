@@ -8,11 +8,11 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import {
-  PageHeader,
-  Card,
+  ScreenHeader,
+  NotebookCard,
   Badge,
   EmptyState,
   LoadingScreen,
@@ -46,7 +46,7 @@ export default function TeacherTimetableScreen() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [classes, setClasses] = useState<TeachClass[]>([]);
-  const [selectedDay, setSelectedDay] = useState(DAYS[new Date().getDay() === 0 ? 0 : new Date().getDay()]);
+  const [selectedDay, setSelectedDay] = useState(DAYS[new Date().getDay()]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -55,19 +55,9 @@ export default function TeacherTimetableScreen() {
 
     try {
       const [timetableRes, classTeacherRes, subjectRes] = await Promise.all([
-        supabase
-          .from('timetable')
-          .select('*, classes(name), subjects(name)')
-          .eq('teacher_id', user.id)
-          .order('start_time'),
-        supabase
-          .from('classes')
-          .select('id, name, grade_level')
-          .eq('teacher_id', user.id),
-        supabase
-          .from('teacher_subjects')
-          .select('class_id, classes(id, name, grade_level), subjects(name)')
-          .eq('teacher_id', user.id),
+        supabase.from('timetable').select('*, classes(name), subjects(name)').eq('teacher_id', user.id).order('start_time'),
+        supabase.from('classes').select('id, name, grade_level').eq('teacher_id', user.id),
+        supabase.from('teacher_subjects').select('class_id, classes(id, name, grade_level), subjects(name)').eq('teacher_id', user.id),
       ]);
 
       const timetable: TimetableEntry[] = (timetableRes.data || []).map((e: any) => ({
@@ -90,12 +80,7 @@ export default function TeacherTimetableScreen() {
       if (classTeacherRes.data) {
         for (const c of classTeacherRes.data) {
           classTeacherIds.add(c.id);
-          merged.push({
-            id: c.id,
-            name: c.name,
-            grade_level: c.grade_level,
-            role: 'class_teacher',
-          });
+          merged.push({ id: c.id, name: c.name, grade_level: c.grade_level, role: 'class_teacher' });
         }
       }
 
@@ -106,13 +91,7 @@ export default function TeacherTimetableScreen() {
           if (!ci) continue;
           if (!classTeacherIds.has(s.class_id)) {
             classTeacherIds.add(s.class_id);
-            merged.push({
-              id: ci.id,
-              name: ci.name,
-              grade_level: ci.grade_level,
-              subject_name: si?.name,
-              role: 'subject_teacher',
-            });
+            merged.push({ id: ci.id, name: ci.name, grade_level: ci.grade_level, subject_name: si?.name, role: 'subject_teacher' });
           } else {
             const existing = merged.find((m) => m.id === s.class_id);
             if (existing && !existing.subject_name) {
@@ -131,20 +110,16 @@ export default function TeacherTimetableScreen() {
     }
   }, [user?.id]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    fetchData();
+    await fetchData();
   }, [fetchData]);
 
   const getDayEntries = (day: string) => {
     const dayIndex = DAYS.indexOf(day);
-    return entries
-      .filter((e) => e.day_of_week === dayIndex)
-      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+    return entries.filter((e) => e.day_of_week === dayIndex).sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
 
   const selectedEntries = getDayEntries(selectedDay);
@@ -152,190 +127,139 @@ export default function TeacherTimetableScreen() {
   if (loading) return <LoadingScreen text="Loading timetable..." />;
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-    >
-      <PageHeader title="Timetable" subtitle="Your weekly schedule" />
+    <View style={styles.root}>
+      <ScreenHeader title="Schedule" subtitle="Your weekly timetable" />
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} />}
+      >
+        {entries.length === 0 && classes.length === 0 ? (
+          <EmptyState icon="📅" title="No Timetable" subtitle="No schedule entries or classes assigned yet." />
+        ) : (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayRow}>
+              {DAYS.map((day) => {
+                const active = day === selectedDay;
+                const count = getDayEntries(day).length;
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.dayChip, active && styles.dayChipActive]}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedDay(day)}
+                  >
+                    <Text style={[styles.dayShort, active && styles.dayShortActive]}>
+                      {DAY_SHORT[DAYS.indexOf(day)]}
+                    </Text>
+                    {count > 0 && (
+                      <View style={[styles.dayDot, active && styles.dayDotActive]}>
+                        <Text style={[styles.dayDotText, active && styles.dayDotTextActive]}>{count}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-      {entries.length === 0 && classes.length === 0 ? (
-        <EmptyState
-          icon="📅"
-          title="No Timetable"
-          subtitle="No schedule entries or classes assigned yet."
-        />
-      ) : (
-        <>
-          <Text style={styles.sectionLabel}>This Week</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayRow}>
-            {DAYS.map((day) => {
-              const active = day === selectedDay;
-              const count = getDayEntries(day).length;
-              return (
-                <TouchableOpacity
-                  key={day}
-                  style={[styles.dayChip, active && styles.dayChipActive]}
-                  activeOpacity={0.7}
-                  onPress={() => setSelectedDay(day)}
-                >
-                  <Text style={[styles.dayShort, active && styles.dayShortActive]}>
-                    {DAY_SHORT[DAYS.indexOf(day)]}
-                  </Text>
-                  {count > 0 && (
-                    <View style={[styles.dayDot, active && styles.dayDotActive]}>
-                      <Text style={[styles.dayDotText, active && styles.dayDotTextActive]}>{count}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+            <SectionHeader title={selectedDay} />
 
-          <SectionHeader title={selectedDay} />
-
-          {selectedEntries.length === 0 ? (
-            <Card>
-              <View style={styles.noClassRow}>
-                <Text style={styles.noClassIcon}>🎉</Text>
-                <View>
-                  <Text style={styles.noClassTitle}>No classes</Text>
-                  <Text style={styles.noClassSub}>Enjoy your free {selectedDay}!</Text>
-                </View>
-              </View>
-            </Card>
-          ) : (
-            selectedEntries.map((entry) => (
-              <Card key={entry.id}>
-                <View style={styles.entryRow}>
-                  <View style={[styles.timeCol, { backgroundColor: COLORS.primaryBg }]}>
-                    <Text style={styles.timeStart}>{entry.start_time.slice(0, 5)}</Text>
-                    <View style={styles.timeLine} />
-                    <Text style={styles.timeEnd}>{entry.end_time.slice(0, 5)}</Text>
+            {selectedEntries.length === 0 ? (
+              <NotebookCard>
+                <View style={styles.noClassRow}>
+                  <Text style={styles.noClassIcon}>✏️</Text>
+                  <View>
+                    <Text style={styles.noClassTitle}>No classes</Text>
+                    <Text style={styles.noClassSub}>Enjoy your free {selectedDay}!</Text>
                   </View>
-                  <View style={styles.entryInfo}>
-                    <Text style={styles.subjectName}>{entry.subject_name || 'Subject'}</Text>
-                    <Text style={styles.className}>{entry.class_name || 'Class'}</Text>
-                    <View style={styles.entryMeta}>
-                      {entry.room ? (
-                        <Badge text={`Room ${entry.room}`} color={COLORS.textSecondary} />
-                      ) : null}
+                </View>
+              </NotebookCard>
+            ) : (
+              selectedEntries.map((entry) => (
+                <NotebookCard key={entry.id} accent={COLORS.chalk}>
+                  <View style={styles.entryRow}>
+                    <View style={[styles.timeCol, { backgroundColor: COLORS.chalkSoft }]}>
+                      <Text style={styles.timeStart}>{entry.start_time.slice(0, 5)}</Text>
+                      <View style={styles.timeLine} />
+                      <Text style={styles.timeEnd}>{entry.end_time.slice(0, 5)}</Text>
+                    </View>
+                    <View style={styles.entryInfo}>
+                      <Text style={styles.subjectName}>{entry.subject_name || 'Subject'}</Text>
+                      <Text style={styles.className}>{entry.class_name || 'Class'}</Text>
+                      {entry.room ? <Badge text={`Room ${entry.room}`} color={COLORS.graphite} /> : null}
                     </View>
                   </View>
-                </View>
-              </Card>
-            ))
-          )}
+                </NotebookCard>
+              ))
+            )}
 
-          <SectionHeader title="My Classes" />
-          {classes.length === 0 ? (
-            <Card>
-              <Text style={styles.noClassSub}>No classes assigned.</Text>
-            </Card>
-          ) : (
-            classes.map((cls) => (
-              <Card key={cls.id}>
-                <View style={styles.classRow}>
-                  <View style={styles.classInfo}>
-                    <Text style={styles.classTitle}>{cls.name}</Text>
-                    <Text style={styles.classSub}>Grade {cls.grade_level}</Text>
+            <SectionHeader title="My Classes" />
+            {classes.length === 0 ? (
+              <NotebookCard>
+                <Text style={styles.noClassSub}>No classes assigned.</Text>
+              </NotebookCard>
+            ) : (
+              classes.map((cls) => (
+                <NotebookCard key={cls.id} accent={cls.role === 'class_teacher' ? COLORS.chalk : COLORS.tape}>
+                  <View style={styles.classRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.classTitle}>{cls.name}</Text>
+                      <Text style={styles.classSub}>Grade {cls.grade_level}</Text>
+                    </View>
+                    <Badge
+                      text={cls.role === 'class_teacher' ? 'Class Teacher' : cls.subject_name || 'Subject'}
+                      color={cls.role === 'class_teacher' ? COLORS.chalk : COLORS.tape}
+                    />
                   </View>
-                  <Badge
-                    text={cls.role === 'class_teacher' ? 'Class Teacher' : cls.subject_name || 'Subject'}
-                    color={cls.role === 'class_teacher' ? COLORS.primary : COLORS.success}
-                  />
-                </View>
-              </Card>
-            ))
-          )}
-        </>
-      )}
-
-      <View style={{ height: 32 }} />
-    </ScrollView>
+                </NotebookCard>
+              ))
+            )}
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    padding: 20,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  dayRow: {
-    marginBottom: 16,
-  },
+  root: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.paper, padding: 20 },
+  dayRow: { marginBottom: 16 },
   dayChip: {
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 14,
     backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
     marginRight: 8,
     minWidth: 56,
-    ...SHADOWS.sm,
   },
   dayChipActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.cover,
+    borderColor: COLORS.cover,
   },
-  dayShort: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-  },
-  dayShortActive: {
-    color: COLORS.textInverse,
-  },
+  dayShort: { fontSize: 13, fontWeight: '700', color: COLORS.graphite },
+  dayShortActive: { color: COLORS.paper },
   dayDot: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: COLORS.primaryBg,
+    backgroundColor: COLORS.chalkSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 4,
   },
-  dayDotActive: {
-    backgroundColor: COLORS.textInverse + '30',
-  },
-  dayDotText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  dayDotTextActive: {
-    color: COLORS.textInverse,
-  },
-  noClassRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  noClassIcon: {
-    fontSize: 28,
-  },
-  noClassTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  noClassSub: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  entryRow: {
-    flexDirection: 'row',
-    gap: 14,
-  },
+  dayDotActive: { backgroundColor: COLORS.paper + '30' },
+  dayDotText: { fontSize: 10, fontWeight: '700', color: COLORS.chalk },
+  dayDotTextActive: { color: COLORS.paper },
+  noClassRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  noClassIcon: { fontSize: 28 },
+  noClassTitle: { fontSize: 15, fontWeight: '700', color: COLORS.ink },
+  noClassSub: { fontSize: 13, color: COLORS.graphite, marginTop: 2 },
+  entryRow: { flexDirection: 'row', gap: 14 },
   timeCol: {
     alignItems: 'center',
     paddingHorizontal: 10,
@@ -343,56 +267,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     minWidth: 60,
   },
-  timeStart: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
-  timeLine: {
-    width: 1,
-    height: 12,
-    backgroundColor: COLORS.primary + '30',
-    marginVertical: 2,
-  },
-  timeEnd: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.primaryLight,
-  },
-  entryInfo: {
-    flex: 1,
-  },
-  subjectName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  className: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  entryMeta: {
-    flexDirection: 'row',
-    marginTop: 6,
-    gap: 6,
-  },
-  classRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  classInfo: {
-    flex: 1,
-  },
-  classTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  classSub: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
+  timeStart: { fontSize: 13, fontWeight: '800', color: COLORS.chalk },
+  timeLine: { width: 1, height: 12, backgroundColor: COLORS.chalk + '30', marginVertical: 2 },
+  timeEnd: { fontSize: 11, fontWeight: '600', color: COLORS.chalkSoft },
+  entryInfo: { flex: 1 },
+  subjectName: { fontSize: 16, fontWeight: '700', color: COLORS.ink },
+  className: { fontSize: 13, color: COLORS.graphite, marginTop: 2 },
+  classRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  classTitle: { fontSize: 16, fontWeight: '700', color: COLORS.ink },
+  classSub: { fontSize: 13, color: COLORS.graphite, marginTop: 2 },
 });

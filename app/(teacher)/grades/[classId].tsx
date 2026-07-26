@@ -1,9 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { COLORS, SHADOWS } from '../../../lib/theme';
+import { COLORS } from '../../../lib/theme';
 import { useAuth } from '../../../lib/auth';
+import {
+  ScreenHeader,
+  NotebookCard,
+  Avatar,
+  EmptyState,
+  LoadingScreen,
+  SectionHeader,
+  PrimaryButton,
+} from '../../../lib/components';
 
 interface ClassInfo { id: string; name: string; grade_level: string; teacher_id: string; }
 interface Student { id: string; full_name: string; email: string; roll_number?: string; }
@@ -49,7 +66,6 @@ export default function TeacherGradesEntryScreen() {
         })).filter((s: Student) => s.id);
         setStudents(mappedStudents);
 
-        // Auto-select student if studentId param passed
         if (studentId) {
           const target = mappedStudents.find((s: Student) => s.id === studentId);
           if (target) {
@@ -71,9 +87,7 @@ export default function TeacherGradesEntryScreen() {
       .select('id, student_id, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term')
       .eq('class_id', classId)
       .eq('student_id', sid);
-    if (data) {
-      setSavedGrades(data as SavedGrade[]);
-    }
+    if (data) setSavedGrades(data as SavedGrade[]);
   };
 
   const handleSelectStudent = async (student: Student) => {
@@ -89,11 +103,7 @@ export default function TeacherGradesEntryScreen() {
   };
 
   const addRow = () => setRows(prev => [...prev, newRow()]);
-
-  const removeRow = (key: string) => {
-    if (rows.length <= 1) return;
-    setRows(prev => prev.filter(r => r.key !== key));
-  };
+  const removeRow = (key: string) => { if (rows.length <= 1) return; setRows(prev => prev.filter(r => r.key !== key)); };
 
   const loadFromSaved = () => {
     if (savedGrades.length === 0) return;
@@ -111,7 +121,6 @@ export default function TeacherGradesEntryScreen() {
 
   const handleSave = async () => {
     if (!selectedStudent) return;
-
     const graded = rows.filter(r => r.name.trim());
     if (graded.length === 0) { Alert.alert('Error', 'Enter at least one subject'); return; }
 
@@ -160,180 +169,172 @@ export default function TeacherGradesEntryScreen() {
     }
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
-  if (!classInfo) return <View style={styles.center}><Text>Class not found</Text></View>;
+  if (loading) return <LoadingScreen text="Loading grades..." />;
+  if (!classInfo) return <EmptyState icon="❌" title="Class not found" />;
 
-  // STEP 2: Selected student — editable table
   if (selectedStudent) {
     return (
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => { setSelectedStudent(null); setRows([newRow(), newRow(), newRow()]); setSavedGrades([]); setOverallGpa(''); }} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back to students</Text>
-        </TouchableOpacity>
+      <View style={styles.root}>
+        <ScreenHeader title="Grades" subtitle={`${classInfo.name} · ${selectedStudent.full_name}`} />
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          <TouchableOpacity onPress={() => { setSelectedStudent(null); setRows([newRow(), newRow(), newRow()]); setSavedGrades([]); setOverallGpa(''); }} style={styles.backBtn}>
+            <Text style={styles.backText}>← Back to students</Text>
+          </TouchableOpacity>
 
-        <View style={styles.studentHeader}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{selectedStudent.full_name[0]}</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.studentName}>{selectedStudent.full_name}</Text>
-            {selectedStudent.roll_number ? <Text style={styles.rollNo}>Roll #{selectedStudent.roll_number}</Text> : null}
+          <View style={styles.studentHeader}>
+            <Avatar name={selectedStudent.full_name} size={44} />
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={styles.studentName}>{selectedStudent.full_name}</Text>
+              {selectedStudent.roll_number ? <Text style={styles.rollNo}>Roll #{selectedStudent.roll_number}</Text> : null}
+            </View>
           </View>
-        </View>
 
-        {isClassTeacher ? (
-          <>
-            <View style={styles.formRow}>
-              <View style={styles.formHalf}>
+          {isClassTeacher ? (
+            <>
+              <NotebookCard>
                 <Text style={styles.formLabel}>Term</Text>
-                <TextInput style={styles.input} value={term} onChangeText={setTerm} placeholder="e.g. Midterm, Term 1, Final" />
-              </View>
-            </View>
+                <TextInput style={styles.input} value={term} onChangeText={setTerm} placeholder="e.g. Midterm, Term 1, Final" placeholderTextColor={COLORS.graphiteLight} />
+              </NotebookCard>
 
-            {savedGrades.length > 0 && (
-              <TouchableOpacity style={styles.loadBtn} onPress={loadFromSaved}>
-                <Text style={styles.loadBtnText}>Load previous grades</Text>
-              </TouchableOpacity>
-            )}
+              {savedGrades.length > 0 && (
+                <TouchableOpacity style={styles.loadBtn} onPress={loadFromSaved}>
+                  <Text style={styles.loadBtnText}>Load previous grades</Text>
+                </TouchableOpacity>
+              )}
 
-            {/* Table */}
-            <View style={styles.table}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Subject</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Theory</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Practical</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>GPA</Text>
-                <View style={{ width: 32 }} />
-              </View>
-
-              {rows.map((row) => (
-                <View key={row.key} style={styles.tableRow}>
-                  <TextInput style={[styles.tableCell, { flex: 2 }]} value={row.name} onChangeText={v => updateRow(row.key, 'name', v)} placeholder="e.g. Math" placeholderTextColor={COLORS.textTertiary} />
-                  <TextInput style={[styles.tableCell, { flex: 1.3 }]} value={row.theory} onChangeText={v => updateRow(row.key, 'theory', v)} placeholder="A+" placeholderTextColor={COLORS.textTertiary} />
-                  <TextInput style={[styles.tableCell, { flex: 1.3 }]} value={row.practical} onChangeText={v => updateRow(row.key, 'practical', v)} placeholder="A" placeholderTextColor={COLORS.textTertiary} />
-                  <TextInput style={[styles.tableCell, { flex: 1.2 }]} keyboardType="numeric" value={row.gpa} onChangeText={v => updateRow(row.key, 'gpa', v)} placeholder="4.0" placeholderTextColor={COLORS.textTertiary} />
-                  <TouchableOpacity style={styles.removeBtn} onPress={() => removeRow(row.key)}>
-                    <Text style={styles.removeBtnText}>×</Text>
-                  </TouchableOpacity>
+              <NotebookCard>
+                <View style={[styles.tableRow, styles.tableHeader]}>
+                  <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Subject</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Theory</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.3 }]}>Practical</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>GPA</Text>
+                  <View style={{ width: 32 }} />
                 </View>
-              ))}
-            </View>
 
-            <TouchableOpacity style={styles.addRowBtn} onPress={addRow}>
-              <Text style={styles.addRowBtnText}>+ Add Subject</Text>
-            </TouchableOpacity>
+                {rows.map((row) => (
+                  <View key={row.key} style={styles.tableRow}>
+                    <TextInput style={[styles.tableCell, { flex: 2 }]} value={row.name} onChangeText={v => updateRow(row.key, 'name', v)} placeholder="e.g. Math" placeholderTextColor={COLORS.graphiteLight} />
+                    <TextInput style={[styles.tableCell, { flex: 1.3 }]} value={row.theory} onChangeText={v => updateRow(row.key, 'theory', v)} placeholder="A+" placeholderTextColor={COLORS.graphiteLight} />
+                    <TextInput style={[styles.tableCell, { flex: 1.3 }]} value={row.practical} onChangeText={v => updateRow(row.key, 'practical', v)} placeholder="A" placeholderTextColor={COLORS.graphiteLight} />
+                    <TextInput style={[styles.tableCell, { flex: 1.2 }]} keyboardType="numeric" value={row.gpa} onChangeText={v => updateRow(row.key, 'gpa', v)} placeholder="4.0" placeholderTextColor={COLORS.graphiteLight} />
+                    <TouchableOpacity style={styles.removeBtn} onPress={() => removeRow(row.key)}>
+                      <Text style={styles.removeBtnText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </NotebookCard>
 
-            {/* Overall GPA */}
-            <View style={styles.overallCard}>
-              <Text style={styles.overallLabel}>Overall GPA</Text>
-              <TextInput
-                style={styles.overallInput}
-                keyboardType="numeric"
-                value={overallGpa}
-                onChangeText={setOverallGpa}
-                placeholder="3.5"
-                placeholderTextColor={COLORS.textTertiary}
-                maxLength={4}
-              />
-              <Text style={styles.overallSub}>/ 4.0</Text>
-            </View>
+              <TouchableOpacity style={styles.addRowBtn} onPress={addRow}>
+                <Text style={styles.addRowBtnText}>+ Add Subject</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-              <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Grades'}</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <View style={[styles.badge, { backgroundColor: COLORS.warningBg }]}>
-            <Text style={[styles.badgeText, { color: COLORS.warning }]}>View Only — Class Teacher only enters grades</Text>
-          </View>
-        )}
+              <NotebookCard style={{ alignItems: 'center' }}>
+                <Text style={styles.overallLabel}>Overall GPA</Text>
+                <TextInput
+                  style={styles.overallInput}
+                  keyboardType="numeric"
+                  value={overallGpa}
+                  onChangeText={setOverallGpa}
+                  placeholder="3.5"
+                  placeholderTextColor={COLORS.graphiteLight}
+                  maxLength={4}
+                />
+                <Text style={styles.overallSub}>/ 4.0</Text>
+              </NotebookCard>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+              <PrimaryButton title="Save Grades" onPress={handleSave} loading={saving} disabled={saving} />
+            </>
+          ) : (
+            <NotebookCard accent={COLORS.pencil}>
+              <Text style={styles.viewOnlyText}>View Only — Class Teacher only enters grades</Text>
+            </NotebookCard>
+          )}
+        </ScrollView>
+      </View>
     );
   }
 
-  // STEP 1: Student list
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backText}>← Back</Text></TouchableOpacity>
-
-      <Text style={styles.className}>{classInfo.name}</Text>
-      <Text style={styles.gradeLevel}>Grade {classInfo.grade_level}</Text>
-
-      {!isClassTeacher && (
-        <View style={[styles.badge, { backgroundColor: COLORS.warningBg, marginBottom: 16 }]}>
-          <Text style={[styles.badgeText, { color: COLORS.warning }]}>View Only</Text>
-        </View>
-      )}
-
-      <Text style={styles.sectionLabel}>Select a student to grade</Text>
-
-      {students.map(s => (
-        <TouchableOpacity key={s.id} style={styles.studentCard} onPress={() => handleSelectStudent(s)}>
-          <View style={styles.studentRow}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{s.full_name[0]}</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.studentName}>{s.full_name}</Text>
-              {s.roll_number ? <Text style={styles.rollNo}>Roll #{s.roll_number}</Text> : null}
-            </View>
-            <Text style={styles.arrow}>›</Text>
-          </View>
+    <View style={styles.root}>
+      <ScreenHeader title="Grades" subtitle={`${classInfo.name} · Grade ${classInfo.grade_level}`} />
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-      ))}
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+        {!isClassTeacher && (
+          <NotebookCard accent={COLORS.pencil}>
+            <Text style={styles.viewOnlyText}>View Only</Text>
+          </NotebookCard>
+        )}
+
+        <SectionHeader title="Select a student to grade" />
+
+        {students.map(s => (
+          <NotebookCard key={s.id} accent={COLORS.chalk} onPress={() => handleSelectStudent(s)}>
+            <View style={styles.studentRow}>
+              <Avatar name={s.full_name} size={40} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.studentName}>{s.full_name}</Text>
+                {s.roll_number ? <Text style={styles.rollNo}>Roll #{s.roll_number}</Text> : null}
+              </View>
+              <Text style={styles.arrow}>›</Text>
+            </View>
+          </NotebookCard>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg },
+  root: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.paper, padding: 20 },
   backBtn: { marginBottom: 12, padding: 4 },
-  backText: { fontSize: 16, color: COLORS.primary, fontWeight: '600' },
-  className: { fontSize: 26, fontWeight: '800', color: COLORS.text, letterSpacing: -0.5 },
-  gradeLevel: { fontSize: 15, color: COLORS.textSecondary, marginTop: 4, marginBottom: 20 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
-
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  badgeText: { fontSize: 13, fontWeight: '600' },
-
-  // Student list
-  studentCard: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 14, marginBottom: 10, ...SHADOWS.sm },
-  studentRow: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primaryBg, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  avatarText: { fontSize: 16, fontWeight: '700', color: COLORS.primary },
-  studentName: { fontSize: 15, fontWeight: '600', color: COLORS.text },
-  rollNo: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  arrow: { fontSize: 22, color: COLORS.textSecondary, fontWeight: '300' },
-
-  // Student detail
+  backText: { fontSize: 16, color: COLORS.tape, fontWeight: '600' },
   studentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  formRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  formHalf: { flex: 1 },
-  formLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 6 },
-  input: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, padding: 12, fontSize: 15, color: COLORS.text },
-
-  loadBtn: { backgroundColor: COLORS.surfaceAlt, padding: 12, borderRadius: 10, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
-  loadBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
-
-  // Table
-  table: { backgroundColor: COLORS.surface, borderRadius: 14, overflow: 'hidden', marginBottom: 10, ...SHADOWS.sm },
-  tableRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: COLORS.border, minHeight: 48 },
-  tableHeader: { backgroundColor: COLORS.surfaceAlt, minHeight: 40 },
-  tableHeaderCell: { fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 10, paddingVertical: 10 },
-  tableCell: { fontSize: 14, color: COLORS.text, paddingHorizontal: 10, paddingVertical: 10 },
+  studentRow: { flexDirection: 'row', alignItems: 'center' },
+  studentName: { fontSize: 15, fontWeight: '600', color: COLORS.ink },
+  rollNo: { fontSize: 13, color: COLORS.graphite, marginTop: 2 },
+  arrow: { fontSize: 22, color: COLORS.graphiteLight, fontWeight: '300' },
+  formLabel: { fontSize: 13, fontWeight: '600', color: COLORS.ink, marginBottom: 6 },
+  input: {
+    backgroundColor: COLORS.paperDim,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: COLORS.ink,
+  },
+  loadBtn: {
+    backgroundColor: COLORS.paperDim,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  loadBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.tape },
+  tableRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: COLORS.line, minHeight: 48 },
+  tableHeader: { backgroundColor: COLORS.paperDim, minHeight: 40 },
+  tableHeaderCell: { fontSize: 11, fontWeight: '700', color: COLORS.graphite, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 10, paddingVertical: 10 },
+  tableCell: { fontSize: 14, color: COLORS.ink, paddingHorizontal: 10, paddingVertical: 10 },
   removeBtn: { width: 32, justifyContent: 'center', alignItems: 'center', paddingVertical: 10 },
   removeBtnText: { fontSize: 20, color: COLORS.danger, fontWeight: '400' },
-
-  addRowBtn: { padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.primary, borderStyle: 'dashed', alignItems: 'center', marginBottom: 20 },
-  addRowBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
-
-  // Overall GPA
-  overallCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, marginBottom: 12, alignItems: 'center', ...SHADOWS.md },
-  overallLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
-  overallInput: { fontSize: 52, fontWeight: '800', color: COLORS.text, marginTop: 8, textAlign: 'center', minWidth: 100 },
-  overallSub: { fontSize: 15, color: COLORS.textSecondary, marginTop: 4 },
-
-  saveBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 8 },
-  saveBtnText: { color: COLORS.textInverse, fontSize: 16, fontWeight: '700' },
+  addRowBtn: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: COLORS.tape,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  addRowBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.tape },
+  overallLabel: { fontSize: 13, fontWeight: '600', color: COLORS.graphite, textTransform: 'uppercase', letterSpacing: 1 },
+  overallInput: { fontSize: 52, fontWeight: '800', color: COLORS.ink, marginTop: 8, textAlign: 'center', minWidth: 100 },
+  overallSub: { fontSize: 15, color: COLORS.graphite, marginTop: 4 },
+  viewOnlyText: { fontSize: 14, fontWeight: '600', color: COLORS.pencil },
 });

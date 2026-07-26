@@ -1,8 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import {
+  ScreenHeader,
+  NotebookCard,
+  Badge,
+  EmptyState,
+  LoadingScreen,
+} from '../../lib/components';
 
 interface AttendanceRecord {
   id: string;
@@ -12,15 +26,11 @@ interface AttendanceRecord {
   class?: { name: string; grade_level: string };
 }
 
-interface CalendarEvent {
-  id: string;
-  title: string;
-  event_date: string;
-  event_type: string;
-}
-
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -32,7 +42,6 @@ function getFirstDayOfMonth(year: number, month: number) {
 export default function StudentAttendanceScreen() {
   const { user } = useAuth();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -40,19 +49,21 @@ export default function StudentAttendanceScreen() {
   const [month, setMonth] = useState(today.getMonth());
   const [year, setYear] = useState(today.getFullYear());
 
-  const fetchData = async (isRefresh = false) => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     if (!user?.id) return;
     if (!isRefresh) setLoading(true);
-    const [attRes, evtRes] = await Promise.all([
-      supabase.from('attendance_records').select('id, date, status, notes, class:classes(name, grade_level)').eq('student_id', user.id).order('date', { ascending: false }),
-      supabase.from('events').select('id, title, event_date, event_type'),
-    ]);
-    if (attRes.data) setRecords(attRes.data as unknown as AttendanceRecord[]);
-    if (evtRes.data) setEvents(evtRes.data as CalendarEvent[]);
+    const { data } = await supabase
+      .from('attendance_records')
+      .select('id, date, status, notes, class:classes(name, grade_level)')
+      .eq('student_id', user.id)
+      .order('date', { ascending: false });
+    if (data) setRecords(data as unknown as AttendanceRecord[]);
     setLoading(false);
-  };
+  }, [user?.id]);
 
-  useEffect(() => { if (user?.id) fetchData(); }, [user?.id]);
+  useEffect(() => {
+    if (user?.id) fetchData();
+  }, [user?.id, fetchData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -69,13 +80,17 @@ export default function StudentAttendanceScreen() {
     setYear(y);
   };
 
-  const getStatusForDate = (dateStr: string) => records.find(r => r.date === dateStr)?.status || null;
-  const getEventsForDate = (dateStr: string) => events.filter(e => e.event_date === dateStr);
+  const getStatusForDate = (dateStr: string) =>
+    records.find((r) => r.date === dateStr)?.status || null;
 
   const getMonthStats = () => {
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const m = records.filter(r => r.date.startsWith(prefix));
-    return { present: m.filter(r => r.status === 'present').length, absent: m.filter(r => r.status === 'absent').length, late: m.filter(r => r.status === 'late').length };
+    const m = records.filter((r) => r.date.startsWith(prefix));
+    return {
+      present: m.filter((r) => r.status === 'present').length,
+      absent: m.filter((r) => r.status === 'absent').length,
+      late: m.filter((r) => r.status === 'late').length,
+    };
   };
 
   const renderCalendar = () => {
@@ -88,7 +103,7 @@ export default function StudentAttendanceScreen() {
     const stat = getMonthStats();
 
     return (
-      <View style={styles.calendarCard}>
+      <NotebookCard>
         <View style={styles.monthNav}>
           <TouchableOpacity onPress={() => navigateMonth(-1)} style={styles.navBtn}>
             <Text style={styles.navText}>‹</Text>
@@ -110,20 +125,27 @@ export default function StudentAttendanceScreen() {
             if (day === null) return <View key={`e-${idx}`} style={styles.cell} />;
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const status = getStatusForDate(dateStr);
-            const dayEvts = getEventsForDate(dateStr);
             const isToday = dateStr === todayStr;
 
-            let bg = 'transparent';
-            let color = COLORS.text;
-            if (status === 'absent') { bg = COLORS.dangerBg; color = COLORS.danger; }
-            else if (status === 'late') { bg = COLORS.warningBg; color = COLORS.warning; }
-            else if (status === 'present') { bg = COLORS.successBg; color = COLORS.success; }
-
             return (
-              <View key={dateStr} style={[styles.cell, { backgroundColor: bg }, isToday && styles.cellToday]}>
-                <Text style={[styles.cellDay, { color }, isToday && styles.cellDayToday]}>{day}</Text>
-                {(status === 'absent' || status === 'late' || dayEvts.length > 0) && (
-                  <View style={[styles.dot, { backgroundColor: status === 'absent' ? COLORS.danger : status === 'late' ? COLORS.warning : COLORS.primary }]} />
+              <View key={dateStr} style={[styles.cell, isToday && styles.cellToday]}>
+                <Text style={[styles.cellDay, isToday && styles.cellDayToday]}>{day}</Text>
+                {status && (
+                  <View
+                    style={[
+                      styles.dot,
+                      {
+                        backgroundColor:
+                          status === 'present'
+                            ? COLORS.chalk
+                            : status === 'absent'
+                            ? COLORS.danger
+                            : status === 'late'
+                            ? COLORS.pencil
+                            : COLORS.graphiteLight,
+                      },
+                    ]}
+                  />
                 )}
               </View>
             );
@@ -131,9 +153,18 @@ export default function StudentAttendanceScreen() {
         </View>
 
         <View style={styles.legend}>
-          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.success }]} /><Text style={styles.legendText}>Present</Text></View>
-          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} /><Text style={styles.legendText}>Absent</Text></View>
-          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: COLORS.warning }]} /><Text style={styles.legendText}>Late</Text></View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: COLORS.chalk }]} />
+            <Text style={styles.legendText}>Present</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} />
+            <Text style={styles.legendText}>Absent</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: COLORS.pencil }]} />
+            <Text style={styles.legendText}>Late</Text>
+          </View>
         </View>
 
         <View style={styles.monthSummary}>
@@ -141,121 +172,224 @@ export default function StudentAttendanceScreen() {
             {stat.present} present · {stat.absent} absent · {stat.late} late
           </Text>
         </View>
-      </View>
+      </NotebookCard>
     );
   };
 
   const statusColor = (s: string) => {
-    if (s === 'present') return COLORS.success;
+    if (s === 'present') return COLORS.chalk;
     if (s === 'absent') return COLORS.danger;
-    if (s === 'late') return COLORS.warning;
-    return COLORS.textSecondary;
+    if (s === 'late') return COLORS.pencil;
+    return COLORS.graphite;
   };
 
-  const statusBg = (s: string) => {
-    if (s === 'present') return COLORS.successBg;
-    if (s === 'absent') return COLORS.dangerBg;
-    if (s === 'late') return COLORS.warningBg;
-    return COLORS.surfaceAlt;
-  };
-
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
-  }
+  if (loading) return <LoadingScreen text="Loading attendance..." />;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.headerTitle}>Attendance</Text>
-
-      {renderCalendar()}
-
-      <Text style={styles.sectionTitle}>History</Text>
-
-      {records.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No records yet</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={records}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          renderItem={({ item }) => {
-            const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
+          tintColor={COLORS.tape}
+          colors={[COLORS.tape]}
+        />
+      }
+    >
+      <ScreenHeader title="Attendance" />
+
+      <View style={styles.body}>
+        {renderCalendar()}
+
+        <Text style={styles.sectionTitle}>History</Text>
+
+        {records.length === 0 ? (
+          <NotebookCard>
+            <EmptyState icon="📋" title="No records yet" />
+          </NotebookCard>
+        ) : (
+          records.slice(0, 20).map((item) => {
+            const className = Array.isArray(item.class)
+              ? item.class[0]?.name
+              : item.class?.name;
             return (
-              <View style={styles.recordCard}>
+              <NotebookCard key={item.id}>
                 <View style={styles.recordRow}>
                   <View style={styles.recordInfo}>
                     <Text style={styles.recordClass}>{className || 'Class'}</Text>
-                    <Text style={styles.recordDate}>{new Date(item.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</Text>
+                    <Text style={styles.recordDate}>
+                      {new Date(item.date).toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </Text>
                   </View>
-                  <View style={[styles.badge, { backgroundColor: statusBg(item.status) }]}>
-                    <Text style={[styles.badgeText, { color: statusColor(item.status) }]}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</Text>
-                  </View>
+                  <Badge
+                    text={item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                    color={statusColor(item.status)}
+                    size="md"
+                  />
                 </View>
-                {item.notes ? <Text style={styles.recordNotes}>{item.notes}</Text> : null}
-              </View>
+                {item.notes ? (
+                  <Text style={styles.recordNotes}>{item.notes}</Text>
+                ) : null}
+              </NotebookCard>
             );
-          }}
-        />
-      )}
-    </View>
+          })
+        )}
+
+        <View style={{ height: 24 }} />
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: COLORS.text, letterSpacing: -0.5, marginBottom: 20 },
-
-  calendarCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.paper,
+  },
+  body: {
     padding: 20,
-    marginBottom: 24,
-    ...SHADOWS.md,
   },
-  monthNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  navBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: COLORS.surfaceAlt },
-  navText: { fontSize: 22, fontWeight: '600', color: COLORS.text },
-  monthTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text },
 
-  dayLabels: { flexDirection: 'row', marginBottom: 6 },
-  dayLabel: { width: `${100 / 7}%`, textAlign: 'center', fontSize: 12, fontWeight: '600', color: COLORS.textTertiary, paddingVertical: 4 },
+  monthNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  navBtn: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
+    backgroundColor: COLORS.paperDim,
+  },
+  navText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.ink,
+  },
+  monthTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.ink,
+  },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, aspectRatio: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 10, marginVertical: 1 },
-  cellToday: { borderWidth: 2, borderColor: COLORS.primary },
-  cellDay: { fontSize: 14, fontWeight: '500' },
-  cellDayToday: { fontWeight: '800' },
-  dot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+  dayLabels: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  dayLabel: {
+    width: `${100 / 7}%`,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.graphiteLight,
+    paddingVertical: 4,
+  },
 
-  legend: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 14 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '500' },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  cell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
+    marginVertical: 1,
+  },
+  cellToday: {
+    borderWidth: 2,
+    borderColor: COLORS.tape,
+  },
+  cellDay: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.ink,
+  },
+  cellDayToday: {
+    fontWeight: '800',
+    color: COLORS.tape,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    marginTop: 2,
+  },
 
-  monthSummary: { marginTop: 12, alignItems: 'center' },
-  monthSummaryText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '500' },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginTop: 14,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 11,
+    color: COLORS.graphite,
+    fontWeight: '500',
+  },
 
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
-  emptyContainer: { alignItems: 'center', marginTop: 24 },
-  emptyText: { color: COLORS.textTertiary, fontSize: 15 },
+  monthSummary: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  monthSummaryText: {
+    fontSize: 13,
+    color: COLORS.graphite,
+    fontWeight: '500',
+  },
 
-  recordCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 14,
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.graphite,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: 10,
-    ...SHADOWS.sm,
+    marginTop: 16,
   },
-  recordRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  recordInfo: { flex: 1 },
-  recordClass: { fontSize: 15, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
-  recordDate: { fontSize: 13, color: COLORS.textSecondary },
-  badge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  recordNotes: { fontSize: 13, color: COLORS.textSecondary, marginTop: 8, fontStyle: 'italic' },
+
+  recordRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recordInfo: {
+    flex: 1,
+  },
+  recordClass: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.ink,
+    marginBottom: 2,
+  },
+  recordDate: {
+    fontSize: 13,
+    color: COLORS.graphite,
+  },
+  recordNotes: {
+    fontSize: 13,
+    color: COLORS.graphiteLight,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
 });

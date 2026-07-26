@@ -1,8 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Linking } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+  Linking,
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import {
+  ScreenHeader,
+  NotebookCard,
+  EmptyState,
+  LoadingScreen,
+} from '../../lib/components';
 
 interface Assignment {
   id: string;
@@ -19,8 +33,10 @@ export default function StudentAssignmentsScreen() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
 
-  const fetchAssignments = async (isRefresh = false) => {
+  const fetchAssignments = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     const { data } = await supabase
       .from('assignments')
@@ -28,9 +44,11 @@ export default function StudentAssignmentsScreen() {
       .order('due_date', { ascending: true });
     if (data) setAssignments(data as unknown as Assignment[]);
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { if (user?.id) fetchAssignments(); }, [user?.id]);
+  useEffect(() => {
+    if (user?.id) fetchAssignments();
+  }, [user?.id, fetchAssignments]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -38,104 +56,267 @@ export default function StudentAssignmentsScreen() {
     setRefreshing(false);
   };
 
+  const toggleDone = (id: string) => {
+    setDoneIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const getDaysLeft = (d: string) => {
     if (!d) return null;
     const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
-    if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, overdue: true, dueSoon: false };
-    if (diff === 0) return { text: 'Due today', overdue: false, dueSoon: true };
-    if (diff <= 3) return { text: `${diff}d left`, overdue: false, dueSoon: true };
-    return { text: `${diff}d left`, overdue: false, dueSoon: false };
+    if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, overdue: true };
+    if (diff === 0) return { text: 'Today', overdue: false };
+    if (diff <= 3) return { text: `${diff}d`, overdue: false };
+    return { text: `${diff}d`, overdue: false };
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+  const priorityDot = (d: string) => {
+    const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
+    if (diff < 0) return COLORS.danger;
+    if (diff <= 2) return COLORS.pencil;
+    return COLORS.graphiteLight;
+  };
+
+  const pendingAssignments = assignments.filter((a) => !doneIds.has(a.id));
+  const doneAssignments = assignments.filter((a) => doneIds.has(a.id));
+
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  if (loading) return <LoadingScreen text="Loading homework..." />;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.headerTitle}>Assignments</Text>
-
-      {assignments.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No assignments posted yet</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={assignments}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          renderItem={({ item }) => {
-            const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
+          tintColor={COLORS.tape}
+          colors={[COLORS.tape]}
+        />
+      }
+    >
+      <ScreenHeader title="Homework" />
+
+      <View style={styles.body}>
+        <View style={styles.toggleRow}>
+          <TouchableOpacity
+            style={[styles.togglePill, !showDone && styles.togglePillActive]}
+            activeOpacity={0.7}
+            onPress={() => setShowDone(false)}
+          >
+            <Text style={[styles.toggleText, !showDone && styles.toggleTextActive]}>
+              Pending ({pendingAssignments.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.togglePill, showDone && styles.togglePillActive]}
+            activeOpacity={0.7}
+            onPress={() => setShowDone(true)}
+          >
+            <Text style={[styles.toggleText, showDone && styles.toggleTextActive]}>
+              Done ({doneAssignments.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {(!showDone ? pendingAssignments : doneAssignments).length === 0 ? (
+          <NotebookCard>
+            <EmptyState
+              icon={showDone ? '✅' : '📄'}
+              title={showDone ? 'No completed tasks' : 'No pending homework'}
+              subtitle={showDone ? 'Complete tasks to see them here' : "You're all caught up!"}
+            />
+          </NotebookCard>
+        ) : (
+          (!showDone ? pendingAssignments : doneAssignments).map((item) => {
             const days = getDaysLeft(item.due_date);
-            const attachments = item.assignment_attachments || [];
+            const isDone = doneIds.has(item.id);
+            const className = Array.isArray(item.class)
+              ? item.class[0]?.name
+              : item.class?.name;
+            const dot = priorityDot(item.due_date);
 
             return (
-              <View style={[styles.card, days?.overdue && styles.cardOverdue, days?.dueSoon && !days?.overdue && styles.cardDueSoon]}>
-                <View style={styles.cardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.cardClass}>{className}</Text>
+              <NotebookCard key={item.id}>
+                <View style={styles.assignmentRow}>
+                  <TouchableOpacity
+                    style={[styles.checkbox, isDone && styles.checkboxDone]}
+                    activeOpacity={0.7}
+                    onPress={() => toggleDone(item.id)}
+                  >
+                    {isDone && <Text style={styles.checkmark}>✓</Text>}
+                  </TouchableOpacity>
+                  <View style={styles.assignmentInfo}>
+                    <Text style={styles.assignmentClass}>
+                      {className || 'Class'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.assignmentTitle,
+                        isDone && styles.assignmentTitleDone,
+                      ]}
+                    >
+                      {item.title}
+                    </Text>
+                    {item.description ? (
+                      <Text style={styles.assignmentDesc} numberOfLines={1}>
+                        {item.description}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.assignmentDue}>
+                      Due {formatDate(item.due_date)}
+                    </Text>
                   </View>
-                  {days && (
-                    <View style={[styles.badge, { backgroundColor: days.overdue ? COLORS.dangerBg : days.dueSoon ? COLORS.warningBg : COLORS.successBg }]}>
-                      <Text style={[styles.badgeText, { color: days.overdue ? COLORS.danger : days.dueSoon ? COLORS.warning : COLORS.success }]}>{days.text}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {item.description ? <Text style={styles.desc}>{item.description}</Text> : null}
-
-                <View style={styles.metaRow}>
-                  {item.due_date && <Text style={styles.metaText}>Due {new Date(item.due_date).toLocaleDateString()}</Text>}
-                  <Text style={styles.metaText}>Posted {new Date(item.created_at).toLocaleDateString()}</Text>
-                </View>
-
-                {attachments.length > 0 && (
-                  <View style={styles.attachSection}>
-                    <Text style={styles.attachLabel}>Attachments</Text>
-                    {attachments.map(att => (
-                      <TouchableOpacity key={att.id} onPress={() => Linking.openURL(att.file_url)}>
-                        <Text style={styles.attachLink}>📎 {att.file_name}</Text>
-                      </TouchableOpacity>
-                    ))}
+                  <View style={styles.assignmentRight}>
+                    <View style={[styles.dot, { backgroundColor: dot }]} />
+                    {days && !isDone && (
+                      <BadgeCompact text={days.text} overdue={days.overdue} />
+                    )}
                   </View>
-                )}
-              </View>
+                </View>
+              </NotebookCard>
             );
-          }}
-        />
-      )}
+          })
+        )}
+
+        <View style={{ height: 24 }} />
+      </View>
+    </ScrollView>
+  );
+}
+
+function BadgeCompact({ text, overdue }: { text: string; overdue: boolean }) {
+  return (
+    <View
+      style={[
+        styles.badge,
+        { backgroundColor: overdue ? COLORS.dangerBg : COLORS.paperDim },
+      ]}
+    >
+      <Text
+        style={[
+          styles.badgeText,
+          { color: overdue ? COLORS.danger : COLORS.graphite },
+        ]}
+      >
+        {text}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: COLORS.text, letterSpacing: -0.5, marginBottom: 20 },
-  emptyContainer: { alignItems: 'center', marginTop: 40 },
-  emptyText: { color: COLORS.textTertiary, fontSize: 15 },
-
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-    ...SHADOWS.sm,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.paper,
   },
-  cardOverdue: { borderLeftColor: COLORS.danger },
-  cardDueSoon: { borderLeftColor: COLORS.warning },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
-  cardClass: { fontSize: 13, color: COLORS.textSecondary },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  desc: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 20, marginBottom: 10 },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  metaText: { fontSize: 12, color: COLORS.textTertiary },
-  attachSection: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.borderLight },
-  attachLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 6 },
-  attachLink: { fontSize: 14, color: COLORS.primary, marginBottom: 4, fontWeight: '500' },
+  body: {
+    padding: 20,
+  },
+
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  togglePill: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.white,
+  },
+  togglePillActive: {
+    backgroundColor: COLORS.cover,
+    borderColor: COLORS.cover,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.graphite,
+  },
+  toggleTextActive: {
+    color: COLORS.paper,
+  },
+
+  assignmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.line,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checkboxDone: {
+    backgroundColor: COLORS.chalk,
+    borderColor: COLORS.chalk,
+  },
+  checkmark: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+  assignmentInfo: {
+    flex: 1,
+  },
+  assignmentClass: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.tape,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  assignmentTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.ink,
+    marginBottom: 2,
+  },
+  assignmentTitleDone: {
+    textDecorationLine: 'line-through',
+    color: COLORS.graphiteLight,
+  },
+  assignmentDesc: {
+    fontSize: 12,
+    color: COLORS.graphite,
+    marginBottom: 2,
+  },
+  assignmentDue: {
+    fontSize: 11,
+    color: COLORS.graphiteLight,
+  },
+  assignmentRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+    marginLeft: 12,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });

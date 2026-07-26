@@ -9,11 +9,20 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { useRouter } from 'expo-router';
+import {
+  ScreenHeader,
+  NotebookCard,
+  Avatar,
+  EmptyState,
+  LoadingScreen,
+  PrimaryButton,
+} from '../../lib/components';
 
 interface Message {
   id: string;
@@ -53,6 +62,7 @@ export default function TeacherMessagesScreen() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [composing, setComposing] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -73,7 +83,6 @@ export default function TeacherMessagesScreen() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
       const msgs = data || [];
 
       const otherIds = new Set<string>();
@@ -84,16 +93,8 @@ export default function TeacherMessagesScreen() {
 
       let nameMap: Record<string, string> = {};
       if (otherIds.size > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', Array.from(otherIds));
-
-        if (profiles) {
-          profiles.forEach((p: any) => {
-            nameMap[p.id] = p.full_name || 'Unknown';
-          });
-        }
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', Array.from(otherIds));
+        if (profiles) profiles.forEach((p: any) => { nameMap[p.id] = p.full_name || 'Unknown'; });
       }
 
       const enriched = msgs.map((m: Message) => ({
@@ -107,26 +108,23 @@ export default function TeacherMessagesScreen() {
       console.error('Error fetching messages:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [user?.id]);
 
-  useEffect(() => {
-    fetchMessages();
+  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchMessages();
   }, [fetchMessages]);
 
   const fetchStudents = async () => {
     if (!user?.id) return;
 
     try {
-      const classTeacherRes = await supabase
-        .from('classes')
-        .select('id, name, grade_level')
-        .eq('teacher_id', user.id);
-
-      const subjectRes = await supabase
-        .from('teacher_subjects')
-        .select('class_id, classes(id, name, grade_level)')
-        .eq('teacher_id', user.id);
+      const classTeacherRes = await supabase.from('classes').select('id, name, grade_level').eq('teacher_id', user.id);
+      const subjectRes = await supabase.from('teacher_subjects').select('class_id, classes(id, name, grade_level)').eq('teacher_id', user.id);
 
       const classIds = new Set<string>();
       const classMap: Record<string, { name: string; grade_level?: string }> = {};
@@ -137,7 +135,6 @@ export default function TeacherMessagesScreen() {
           classMap[c.id] = { name: c.name, grade_level: c.grade_level };
         }
       }
-
       if (subjectRes.data) {
         for (const s of subjectRes.data) {
           const cls = s.classes as any;
@@ -148,33 +145,15 @@ export default function TeacherMessagesScreen() {
         }
       }
 
-      if (classIds.size === 0) {
-        setStudents([]);
-        return;
-      }
+      if (classIds.size === 0) { setStudents([]); return; }
 
-      const { data: enrollments } = await supabase
-        .from('class_enrollments')
-        .select('student_id, class_id')
-        .in('class_id', Array.from(classIds));
-
-      if (!enrollments || enrollments.length === 0) {
-        setStudents([]);
-        return;
-      }
+      const { data: enrollments } = await supabase.from('class_enrollments').select('student_id, class_id').in('class_id', Array.from(classIds));
+      if (!enrollments || enrollments.length === 0) { setStudents([]); return; }
 
       const studentIds = enrollments.map((e: any) => e.student_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', studentIds);
-
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', studentIds);
       const profileMap: Record<string, string> = {};
-      if (profiles) {
-        profiles.forEach((p: any) => {
-          profileMap[p.id] = p.full_name || 'Unknown';
-        });
-      }
+      if (profiles) profiles.forEach((p: any) => { profileMap[p.id] = p.full_name || 'Unknown'; });
 
       const result: Student[] = enrollments.map((e: any) => ({
         id: e.student_id,
@@ -205,13 +184,9 @@ export default function TeacherMessagesScreen() {
 
     try {
       const { error } = await supabase.from('messages').insert({
-        sender_id: user.id,
-        recipient_id: selectedRecipient.id,
-        body: messageBody.trim(),
+        sender_id: user.id, recipient_id: selectedRecipient.id, body: messageBody.trim(),
       });
-
       if (error) throw error;
-
       setComposing(false);
       setSelectedRecipient(null);
       setMessageBody('');
@@ -235,426 +210,165 @@ export default function TeacherMessagesScreen() {
     return acc;
   }, {});
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isSent = item.sender_id === user?.id;
-    const otherName = isSent ? item.recipient_name : item.sender_name;
-    const preview = item.body.length > 80 ? item.body.slice(0, 80) + '...' : item.body;
-    const isUnread = !isSent;
-
-    return (
-      <TouchableOpacity style={styles.msgCard} activeOpacity={0.7}>
-        <View style={styles.msgLeft}>
-          <View style={styles.msgAvatar}>
-            <Text style={styles.msgAvatarText}>{(otherName || '?')[0]}</Text>
-          </View>
-          <View style={styles.msgContent}>
-            <View style={styles.msgTopRow}>
-              <Text style={styles.msgName} numberOfLines={1}>
-                {isSent ? `To: ${otherName}` : otherName}
-              </Text>
-              <Text style={styles.msgTime}>{timeAgo(item.created_at)}</Text>
-            </View>
-            <Text style={styles.msgPreview} numberOfLines={2}>
-              {preview}
-            </Text>
-          </View>
-        </View>
-        {isUnread && <View style={styles.unreadDot} />}
-      </TouchableOpacity>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  if (loading) return <LoadingScreen text="Loading messages..." />;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
-        <TouchableOpacity onPress={() => router.push('/(teacher)/profile')} activeOpacity={0.7}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{(profile?.full_name || 'T')[0]}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {composing ? (
-        <KeyboardAvoidingView
-          style={styles.composeContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          {!selectedRecipient ? (
-            <View style={styles.pickerSection}>
-              <View style={styles.pickerHeader}>
-                <Text style={styles.pickerTitle}>Select Recipient</Text>
-                <TouchableOpacity onPress={() => setComposing(false)}>
-                  <Text style={{ fontSize: 24, color: COLORS.textSecondary }}>✕</Text>
-                </TouchableOpacity>
+    <View style={styles.root}>
+      <ScreenHeader title="Messages" subtitle="Send messages to students" />
+      <View style={styles.container}>
+        {composing ? (
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            {!selectedRecipient ? (
+              <View style={styles.pickerSection}>
+                <View style={styles.pickerHeader}>
+                  <Text style={styles.pickerTitle}>Select Recipient</Text>
+                  <TouchableOpacity onPress={() => setComposing(false)}>
+                    <Text style={{ fontSize: 24, color: COLORS.graphite }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search students..."
+                  placeholderTextColor={COLORS.graphiteLight}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                <FlatList
+                  data={Object.entries(groupedStudents)}
+                  keyExtractor={([label]) => label}
+                  renderItem={(item: any) => {
+                    const [label, studs] = item.item as [string, Student[]];
+                    return (
+                      <View>
+                        <Text style={styles.groupLabel}>{label}</Text>
+                        {studs.map((s: any) => (
+                          <NotebookCard key={s.id} accent={COLORS.chalk} onPress={() => setSelectedRecipient(s)}>
+                            <View style={styles.studentRow}>
+                              <Avatar name={s.full_name} size={34} />
+                              <Text style={styles.studentName}>{s.full_name}</Text>
+                            </View>
+                          </NotebookCard>
+                        ))}
+                      </View>
+                    );
+                  }}
+                  ListEmptyComponent={<EmptyState icon="🔍" title="No students found" />}
+                />
               </View>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search students..."
-                placeholderTextColor={COLORS.textTertiary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
+            ) : (
+              <View style={styles.composeSection}>
+                <View style={styles.composeHeader}>
+                  <TouchableOpacity onPress={() => setSelectedRecipient(null)} style={styles.backBtn}>
+                    <Text style={{ fontSize: 22, color: COLORS.tape }}>←</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.composeTo} numberOfLines={1}>To: {selectedRecipient.full_name}</Text>
+                  <TouchableOpacity onPress={() => setComposing(false)}>
+                    <Text style={{ fontSize: 24, color: COLORS.graphite }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.bodyInput}
+                  placeholder="Type your message..."
+                  placeholderTextColor={COLORS.graphiteLight}
+                  value={messageBody}
+                  onChangeText={setMessageBody}
+                  multiline
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                />
+                <PrimaryButton title="Send" onPress={handleSend} loading={sending} disabled={!messageBody.trim() || sending} />
+              </View>
+            )}
+          </KeyboardAvoidingView>
+        ) : (
+          <>
+            {messages.length === 0 ? (
+              <EmptyState
+                icon="💬"
+                title="No Messages"
+                subtitle="Tap the button below to send your first message."
+                action={{ label: 'Compose', onPress: handleOpenCompose }}
               />
+            ) : (
               <FlatList
-                data={Object.entries(groupedStudents)}
-                keyExtractor={([label]) => label}
-                renderItem={(item: any) => {
-                  const [label, studs] = item.item as [string, Student[]];
+                data={messages}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} />}
+                renderItem={({ item }) => {
+                  const isSent = item.sender_id === user?.id;
+                  const otherName = isSent ? item.recipient_name : item.sender_name;
+                  const preview = item.body.length > 80 ? item.body.slice(0, 80) + '...' : item.body;
+
                   return (
-                  <View>
-                    <Text style={styles.groupLabel}>{label}</Text>
-                    {studs.map((s: any) => (
-                      <TouchableOpacity
-                        key={s.id}
-                        style={styles.studentRow}
-                        activeOpacity={0.7}
-                        onPress={() => setSelectedRecipient(s)}
-                      >
-                        <View style={styles.studentAvatar}>
-                          <Text style={styles.studentAvatarText}>{s.full_name[0]}</Text>
+                    <NotebookCard accent={isSent ? COLORS.graphiteLight : COLORS.tape}>
+                      <View style={styles.msgLeft}>
+                        <Avatar name={otherName || '?'} size={40} />
+                        <View style={styles.msgContent}>
+                          <View style={styles.msgTopRow}>
+                            <Text style={styles.msgName} numberOfLines={1}>
+                              {isSent ? `To: ${otherName}` : otherName}
+                            </Text>
+                            <Text style={styles.msgTime}>{timeAgo(item.created_at)}</Text>
+                          </View>
+                          <Text style={styles.msgPreview} numberOfLines={2}>{preview}</Text>
                         </View>
-                        <Text style={styles.studentName}>{s.full_name}</Text>
-                        <Text style={{ fontSize: 18, color: COLORS.textTertiary }}>➡️</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                      </View>
+                    </NotebookCard>
                   );
                 }}
-                ListEmptyComponent={
-                  <Text style={styles.emptyText}>No students found</Text>
-                }
               />
-            </View>
-          ) : (
-            <View style={styles.composeSection}>
-              <View style={styles.composeHeader}>
-                <TouchableOpacity
-                  onPress={() => setSelectedRecipient(null)}
-                  style={styles.backBtn}
-                >
-                   <Text style={{ fontSize: 22, color: COLORS.primary }}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.composeTo} numberOfLines={1}>
-                  To: {selectedRecipient.full_name}
-                </Text>
-                <TouchableOpacity onPress={() => setComposing(false)}>
-                  <Text style={{ fontSize: 24, color: COLORS.textSecondary }}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                style={styles.bodyInput}
-                placeholder="Type your message..."
-                placeholderTextColor={COLORS.textTertiary}
-                value={messageBody}
-                onChangeText={setMessageBody}
-                multiline
-                numberOfLines={5}
-                textAlignVertical="top"
-              />
-              <TouchableOpacity
-                style={[
-                  styles.sendBtn,
-                  (!messageBody.trim() || sending) && styles.sendBtnDisabled,
-                ]}
-                activeOpacity={0.7}
-                onPress={handleSend}
-                disabled={!messageBody.trim() || sending}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color={COLORS.textInverse} />
-                ) : (
-                  <Text style={styles.sendBtnText}>Send</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-        </KeyboardAvoidingView>
-      ) : (
-        <>
-          {messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={{ fontSize: 64, color: COLORS.textTertiary }}>💬</Text>
-              <Text style={styles.emptyTitle}>No Messages</Text>
-              <Text style={styles.emptySubtitle}>
-                Tap the button below to send your first message.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={messages}
-              keyExtractor={(item) => item.id}
-              renderItem={renderMessage}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
+            )}
 
-          <TouchableOpacity style={styles.fab} activeOpacity={0.8} onPress={handleOpenCompose}>
-            <Text style={{ fontSize: 28, color: COLORS.textInverse }}>✉️</Text>
-          </TouchableOpacity>
-        </>
-      )}
+            <TouchableOpacity style={styles.fab} activeOpacity={0.8} onPress={handleOpenCompose}>
+              <Text style={styles.fabText}>✉</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    padding: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: COLORS.text,
-    letterSpacing: -0.5,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-
-  list: {
-    paddingBottom: 80,
-  },
-  msgCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...SHADOWS.sm,
-  },
-  msgLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  msgAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  msgAvatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  msgContent: {
-    flex: 1,
-  },
-  msgTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  msgName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.text,
-    flex: 1,
-    marginRight: 8,
-  },
-  msgTime: {
-    fontSize: 12,
-    color: COLORS.textTertiary,
-  },
-  msgPreview: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.primary,
-    marginLeft: 8,
-  },
-
+  root: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.paper, padding: 20 },
+  list: { paddingBottom: 80 },
+  msgLeft: { flexDirection: 'row', alignItems: 'center' },
+  msgContent: { flex: 1, marginLeft: 12 },
+  msgTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  msgName: { fontSize: 15, fontWeight: '600', color: COLORS.ink, flex: 1, marginRight: 8 },
+  msgTime: { fontSize: 12, color: COLORS.graphiteLight },
+  msgPreview: { fontSize: 13, color: COLORS.graphite, lineHeight: 18 },
   fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.lg,
+    position: 'absolute', bottom: 24, right: 20, width: 56, height: 56,
+    borderRadius: 28, backgroundColor: COLORS.cover, justifyContent: 'center',
+    alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 12, elevation: 5,
   },
-
-  composeContainer: {
-    flex: 1,
-  },
-  pickerSection: {
-    flex: 1,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
+  fabText: { fontSize: 24, color: COLORS.paper },
+  composeContainer: { flex: 1 },
+  pickerSection: { flex: 1 },
+  pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  pickerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.ink },
   searchInput: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 12,
+    backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, fontSize: 15,
+    color: COLORS.ink, borderWidth: 1, borderColor: COLORS.line, marginBottom: 12,
   },
   groupLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 12,
-    marginBottom: 6,
-    paddingLeft: 4,
+    fontSize: 13, fontWeight: '700', color: COLORS.graphite, textTransform: 'uppercase',
+    letterSpacing: 0.5, marginTop: 12, marginBottom: 6, paddingLeft: 4,
   },
-  studentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6,
-    ...SHADOWS.sm,
-  },
-  studentAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: COLORS.successBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  studentAvatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.success,
-  },
-  studentName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: COLORS.text,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: COLORS.textTertiary,
-    marginTop: 32,
-    fontSize: 15,
-  },
-
-  composeSection: {
-    flex: 1,
-  },
-  composeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  backBtn: {
-    marginRight: 10,
-  },
-  composeTo: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
+  studentRow: { flexDirection: 'row', alignItems: 'center' },
+  studentName: { flex: 1, fontSize: 15, fontWeight: '500', color: COLORS.ink, marginLeft: 10 },
+  composeSection: { flex: 1 },
+  composeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  backBtn: { marginRight: 10 },
+  composeTo: { flex: 1, fontSize: 16, fontWeight: '600', color: COLORS.ink },
   bodyInput: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    minHeight: 120,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  sendBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  sendBtnDisabled: {
-    opacity: 0.5,
-  },
-  sendBtnText: {
-    color: COLORS.textInverse,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
+    backgroundColor: COLORS.surface, borderRadius: 12, padding: 14, fontSize: 15,
+    color: COLORS.ink, borderWidth: 1, borderColor: COLORS.line, minHeight: 120,
+    marginBottom: 12, lineHeight: 20,
   },
 });

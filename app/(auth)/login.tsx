@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useAuth } from '../../lib/auth';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { getSavedAccounts, saveAccount, removeAccount, type SavedAccount } from '../../lib/accounts';
 
 const Login = () => {
@@ -72,12 +72,14 @@ const Login = () => {
         style={styles.keyboard}
       >
         <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoIcon}>🎓</Text>
+          {/* Cover header */}
+          <View style={styles.cover}>
+            <View style={styles.tapeStrip}>
+              <Text style={styles.tapeText}>EDIFY</Text>
             </View>
-            <Text style={styles.title}>Edify International</Text>
-            <Text style={styles.subtitle}>Sign in to your account</Text>
+            <Text style={styles.schoolLabel}>EDIFY INTERNATIONAL SCHOOL</Text>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Sign in to continue</Text>
           </View>
 
           {savedAccounts.length > 0 && (
@@ -118,7 +120,7 @@ const Login = () => {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="you@example.com"
-                placeholderTextColor={COLORS.textTertiary}
+                placeholderTextColor={COLORS.graphiteLight}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 onFocus={() => setFocusedField('email')}
@@ -133,7 +135,7 @@ const Login = () => {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Enter your password"
-                placeholderTextColor={COLORS.textTertiary}
+                placeholderTextColor={COLORS.graphiteLight}
                 secureTextEntry
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
@@ -150,9 +152,7 @@ const Login = () => {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.footer}>
-            International School Management System
-          </Text>
+          <Text style={styles.footer}>International School Management System</Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -160,154 +160,87 @@ const Login = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  keyboard: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  keyboard: { flex: 1 },
+  content: { flex: 1, justifyContent: 'center', padding: 20 },
+  cover: {
+    backgroundColor: COLORS.cover,
+    borderRadius: 18,
     padding: 24,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logoIcon: {
-    fontSize: 36,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.text,
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-  },
-  accountsSection: {
     marginBottom: 24,
+    overflow: 'hidden',
   },
-  accountsLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 10,
+  tapeStrip: {
+    position: 'absolute',
+    top: -10,
+    alignSelf: 'center',
+    backgroundColor: COLORS.tape,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 2,
+    transform: [{ rotate: '-1.5deg' }],
+    zIndex: 10,
   },
+  tapeText: { color: COLORS.white, fontSize: 10, letterSpacing: 1, fontWeight: '700' },
+  schoolLabel: { fontSize: 10, color: COLORS.graphiteLight, letterSpacing: 1.5, fontWeight: '600', marginTop: 8 },
+  title: { fontSize: 28, fontWeight: '800', color: COLORS.paper, marginTop: 4 },
+  subtitle: { fontSize: 13, color: COLORS.graphiteLight, marginTop: 4 },
+  accountsSection: { marginBottom: 20 },
+  accountsLabel: { fontSize: 11, fontWeight: '700', color: COLORS.graphite, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   accountCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.line,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 6,
   },
   accountAvatar: {
     width: 36,
     height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.primaryBg,
+    borderRadius: 18,
+    backgroundColor: COLORS.chalkSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  accountAvatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  accountInfo: {
-    flex: 1,
-  },
-  accountName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  accountRole: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'capitalize',
-  },
+  accountAvatarText: { fontSize: 14, fontWeight: '700', color: COLORS.chalk },
+  accountInfo: { flex: 1 },
+  accountName: { fontSize: 14, fontWeight: '600', color: COLORS.ink },
+  accountRole: { fontSize: 12, color: COLORS.graphite, textTransform: 'capitalize' },
   formCard: {
     backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.line,
     borderRadius: 16,
-    padding: 24,
-    ...SHADOWS.md,
+    padding: 20,
   },
-  inputGroup: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: 8,
-  },
+  inputGroup: { marginBottom: 16 },
+  label: { fontSize: 13, fontWeight: '600', color: COLORS.ink, marginBottom: 6 },
   input: {
-    backgroundColor: COLORS.surfaceAlt,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  inputFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.surface,
-  },
-  errorBanner: {
-    backgroundColor: COLORS.dangerBg,
+    backgroundColor: COLORS.paperDim,
+    borderWidth: 1,
+    borderColor: COLORS.line,
     borderRadius: 10,
-    padding: 12,
-    marginBottom: 18,
+    padding: 13,
+    fontSize: 15,
+    color: COLORS.ink,
   },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+  inputFocused: { borderColor: COLORS.cover, backgroundColor: COLORS.surface },
+  errorBanner: { backgroundColor: COLORS.dangerBg, borderRadius: 8, padding: 10, marginBottom: 16 },
+  errorText: { color: COLORS.danger, fontSize: 13, fontWeight: '500', textAlign: 'center' },
   button: {
-    backgroundColor: COLORS.primary,
-    padding: 16,
+    backgroundColor: COLORS.cover,
+    padding: 14,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: COLORS.textInverse,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  footer: {
-    textAlign: 'center',
-    color: COLORS.textTertiary,
-    fontSize: 13,
-    marginTop: 32,
-  },
+  buttonDisabled: { opacity: 0.5 },
+  buttonText: { color: COLORS.paper, fontSize: 15, fontWeight: '700' },
+  footer: { textAlign: 'center', color: COLORS.graphiteLight, fontSize: 12, marginTop: 24 },
 });
 
 export default Login;

@@ -1,9 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
-import { PageHeader, StatCard, Card, Badge, EmptyState, LoadingScreen, SectionHeader } from '../../lib/components';
+import {
+  ScreenHeader,
+  NotebookCard,
+  Badge,
+  EmptyState,
+  LoadingScreen,
+  SectionHeader,
+} from '../../lib/components';
 
 interface FeeStructure {
   id: string;
@@ -24,7 +37,6 @@ interface FeePayment {
   payment_method: string;
   receipt_number: string;
   status: 'pending' | 'partial' | 'paid' | 'overdue';
-  notes: string;
 }
 
 export default function StudentFeesScreen() {
@@ -34,11 +46,9 @@ export default function StudentFeesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async (isRefresh = false) => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     if (!user?.id || !profile?.school_id) return;
     if (!isRefresh) setLoading(true);
-
-    const gradeLevel = profile?.grade_level || profile?.role;
 
     const [structRes, payRes] = await Promise.all([
       supabase
@@ -48,7 +58,7 @@ export default function StudentFeesScreen() {
         .order('due_date', { ascending: true }),
       supabase
         .from('fee_payments')
-        .select('id, fee_structure_id, student_id, amount_paid, payment_date, payment_method, receipt_number, status, notes')
+        .select('id, fee_structure_id, student_id, amount_paid, payment_date, payment_method, receipt_number, status')
         .eq('student_id', user.id)
         .order('payment_date', { ascending: false }),
     ]);
@@ -56,11 +66,11 @@ export default function StudentFeesScreen() {
     if (structRes.data) setStructures(structRes.data);
     if (payRes.data) setPayments(payRes.data);
     setLoading(false);
-  };
+  }, [user?.id, profile?.school_id]);
 
   useEffect(() => {
     fetchData();
-  }, [user?.id, profile?.school_id]);
+  }, [fetchData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -88,28 +98,16 @@ export default function StudentFeesScreen() {
     .filter((p) => p.status === 'paid')
     .reduce((sum, p) => sum + p.amount_paid, 0);
   const totalPending = totalFees - totalPaid;
-  const overdueCount = payments.filter((p) => p.status === 'overdue').length +
-    structures.filter((s) => {
-      const pays = paymentMap.get(s.id) || [];
-      return pays.length === 0 && new Date(s.due_date) < new Date();
-    }).length;
+
+  const statusColor = (s: string) => {
+    if (s === 'paid') return COLORS.chalk;
+    if (s === 'partial') return COLORS.pencil;
+    if (s === 'overdue') return COLORS.danger;
+    return COLORS.graphite;
+  };
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-  const statusColor = (s: string) => {
-    if (s === 'paid') return COLORS.success;
-    if (s === 'partial') return COLORS.warning;
-    if (s === 'overdue') return COLORS.danger;
-    return COLORS.textSecondary;
-  };
-
-  const statusBg = (s: string) => {
-    if (s === 'paid') return COLORS.successBg;
-    if (s === 'partial') return COLORS.warningBg;
-    if (s === 'overdue') return COLORS.dangerBg;
-    return COLORS.surfaceAlt;
-  };
 
   if (loading) return <LoadingScreen text="Loading fees..." />;
 
@@ -117,132 +115,210 @@ export default function StudentFeesScreen() {
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={COLORS.tape}
+          colors={[COLORS.tape]}
+        />
+      }
     >
-      <PageHeader title="Fees" subtitle={`${structures.length} fee items`} />
+      <ScreenHeader title="Fees" />
 
-      <View style={styles.statsRow}>
-        <View style={styles.statCol}>
-          <StatCard icon="💰" label="Total Fees" value={`$${totalFees}`} color={COLORS.primary} />
+      <View style={styles.body}>
+        <View style={styles.summaryRow}>
+          <View style={[styles.summaryItem, { borderLeftColor: COLORS.ink }]}>
+            <Text style={styles.summaryLabel}>Total</Text>
+            <Text style={styles.summaryValue}>${totalFees}</Text>
+          </View>
+          <View style={[styles.summaryItem, { borderLeftColor: COLORS.chalk }]}>
+            <Text style={styles.summaryLabel}>Paid</Text>
+            <Text style={[styles.summaryValue, { color: COLORS.chalk }]}>${totalPaid}</Text>
+          </View>
+          <View style={[styles.summaryItem, { borderLeftColor: COLORS.pencil }]}>
+            <Text style={styles.summaryLabel}>Pending</Text>
+            <Text style={[styles.summaryValue, { color: COLORS.pencil }]}>${totalPending}</Text>
+          </View>
         </View>
-        <View style={styles.statCol}>
-          <StatCard icon="✅" label="Paid" value={`$${totalPaid}`} color={COLORS.success} />
-        </View>
-      </View>
-      <View style={styles.statsRow}>
-        <View style={styles.statCol}>
-          <StatCard icon="⏳" label="Pending" value={`$${totalPending}`} color={COLORS.warning} />
-        </View>
-        <View style={styles.statCol}>
-          <StatCard icon="🚨" label="Overdue" value={overdueCount} color={COLORS.danger} />
-        </View>
-      </View>
 
-      <SectionHeader title="Fee Breakdown" />
+        <SectionHeader title="Fee Breakdown" />
 
-      {structures.length === 0 ? (
-        <EmptyState icon="💰" title="No fees found" subtitle="No fee structures for your grade" />
-      ) : (
-        structures.map((struct) => {
-          const { status, paid } = getPaymentStatus(struct.id);
-          const remaining = struct.amount - paid;
-          const overdue = status === 'pending' && new Date(struct.due_date) < new Date();
+        {structures.length === 0 ? (
+          <NotebookCard>
+            <EmptyState icon="💰" title="No fees found" subtitle="No fee structures for your grade" />
+          </NotebookCard>
+        ) : (
+          structures.map((struct) => {
+            const { status, paid } = getPaymentStatus(struct.id);
+            const remaining = struct.amount - paid;
+            const overdue =
+              status === 'pending' && new Date(struct.due_date) < new Date();
+            const displayStatus = overdue ? 'overdue' : status;
 
-          return (
-            <Card key={struct.id} style={styles.feeCard}>
-              <View style={styles.feeTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.feeName}>{struct.name}</Text>
-                  <Text style={styles.feeMeta}>{struct.term} · {struct.grade_level}</Text>
-                </View>
-                <Badge
-                  text={overdue ? 'overdue' : status}
-                  color={overdue ? COLORS.danger : statusColor(status)}
-                  size="md"
-                />
-              </View>
-
-              {struct.description ? (
-                <Text style={styles.feeDesc}>{struct.description}</Text>
-              ) : null}
-
-              <View style={styles.feeAmountRow}>
-                <View style={styles.feeAmountCol}>
-                  <Text style={styles.feeAmountLabel}>Amount</Text>
-                  <Text style={styles.feeAmountValue}>${struct.amount}</Text>
-                </View>
-                <View style={styles.feeAmountCol}>
-                  <Text style={styles.feeAmountLabel}>Paid</Text>
-                  <Text style={[styles.feeAmountValue, { color: paid > 0 ? COLORS.success : COLORS.textSecondary }]}>${paid}</Text>
-                </View>
-                <View style={styles.feeAmountCol}>
-                  <Text style={styles.feeAmountLabel}>Remaining</Text>
-                  <Text style={[styles.feeAmountValue, { color: remaining > 0 ? COLORS.danger : COLORS.success }]}>${remaining > 0 ? remaining : 0}</Text>
-                </View>
-              </View>
-
-              {struct.amount > 0 && (
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${Math.min((paid / struct.amount) * 100, 100)}%`,
-                        backgroundColor: status === 'paid' ? COLORS.success : COLORS.primary,
-                      },
-                    ]}
+            return (
+              <NotebookCard key={struct.id}>
+                <View style={styles.feeTop}>
+                  <View style={styles.feeInfo}>
+                    <Text style={styles.feeName}>{struct.name}</Text>
+                    <Text style={styles.feeMeta}>
+                      {struct.term} · {struct.grade_level}
+                    </Text>
+                  </View>
+                  <Badge
+                    text={displayStatus}
+                    color={statusColor(displayStatus)}
+                    size="md"
                   />
                 </View>
-              )}
 
-              <View style={styles.feeFooter}>
-                <Text style={styles.feeDate}>Due: {formatDate(struct.due_date)}</Text>
-                {payments.filter((p) => p.fee_structure_id === struct.id).length > 0 && (
-                  <Text style={styles.feeReceipt}>
-                    Last: {payments.filter((p) => p.fee_structure_id === struct.id)[0].receipt_number || '—'}
-                  </Text>
+                {struct.description ? (
+                  <Text style={styles.feeDesc}>{struct.description}</Text>
+                ) : null}
+
+                <View style={styles.amountRow}>
+                  <View style={styles.amountCol}>
+                    <Text style={styles.amountLabel}>Amount</Text>
+                    <Text style={styles.amountValue}>${struct.amount}</Text>
+                  </View>
+                  <View style={styles.amountCol}>
+                    <Text style={styles.amountLabel}>Paid</Text>
+                    <Text style={[styles.amountValue, { color: paid > 0 ? COLORS.chalk : COLORS.graphite }]}>
+                      ${paid}
+                    </Text>
+                  </View>
+                  <View style={styles.amountCol}>
+                    <Text style={styles.amountLabel}>Remaining</Text>
+                    <Text style={[styles.amountValue, { color: remaining > 0 ? COLORS.danger : COLORS.chalk }]}>
+                      ${remaining > 0 ? remaining : 0}
+                    </Text>
+                  </View>
+                </View>
+
+                {struct.amount > 0 && (
+                  <View style={styles.progressBar}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${Math.min((paid / struct.amount) * 100, 100)}%`,
+                          backgroundColor:
+                            status === 'paid' ? COLORS.chalk : COLORS.tape,
+                        },
+                      ]}
+                    />
+                  </View>
                 )}
-              </View>
-            </Card>
-          );
-        })
-      )}
 
-      <View style={{ height: 24 }} />
+                <View style={styles.feeFooter}>
+                  <Text style={styles.feeDate}>Due: {formatDate(struct.due_date)}</Text>
+                  {payments.filter((p) => p.fee_structure_id === struct.id).length > 0 && (
+                    <Text style={styles.feeReceipt}>
+                      Receipt: {payments.filter((p) => p.fee_structure_id === struct.id)[0].receipt_number || '—'}
+                    </Text>
+                  )}
+                </View>
+              </NotebookCard>
+            );
+          })
+        )}
+
+        <View style={{ height: 24 }} />
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.paper,
   },
-  statCol: { flex: 1 },
+  body: {
+    padding: 20,
+  },
 
-  feeCard: { borderLeftWidth: 4, borderLeftColor: COLORS.primary },
-  feeTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
-  feeName: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
-  feeMeta: { fontSize: 13, color: COLORS.textSecondary },
-  feeDesc: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 10, lineHeight: 18 },
-
-  feeAmountRow: {
+  summaryRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surfaceAlt,
+    gap: 8,
+    marginBottom: 8,
+  },
+  summaryItem: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 12,
+    padding: 12,
+    borderLeftWidth: 4,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.graphite,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
+
+  feeTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  feeInfo: {
+    flex: 1,
+  },
+  feeName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.ink,
+    marginBottom: 2,
+  },
+  feeMeta: {
+    fontSize: 13,
+    color: COLORS.graphite,
+  },
+  feeDesc: {
+    fontSize: 13,
+    color: COLORS.graphiteLight,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+
+  amountRow: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.paperDim,
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 10,
     marginBottom: 10,
   },
-  feeAmountCol: { flex: 1, alignItems: 'center' },
-  feeAmountLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  feeAmountValue: { fontSize: 16, fontWeight: '800', color: COLORS.text },
+  amountCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  amountLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.graphite,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  amountValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
 
   progressBar: {
-    height: 6,
-    backgroundColor: COLORS.surfaceAlt,
+    height: 5,
+    backgroundColor: COLORS.paperDim,
     borderRadius: 3,
     marginBottom: 10,
     overflow: 'hidden',
@@ -252,7 +328,17 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
-  feeFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  feeDate: { fontSize: 12, color: COLORS.textTertiary },
-  feeReceipt: { fontSize: 12, color: COLORS.textTertiary },
+  feeFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  feeDate: {
+    fontSize: 12,
+    color: COLORS.graphiteLight,
+  },
+  feeReceipt: {
+    fontSize: 12,
+    color: COLORS.graphiteLight,
+  },
 });

@@ -1,8 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import {
+  ScreenHeader,
+  NotebookCard,
+  EmptyState,
+  LoadingScreen,
+  PillSelector,
+} from '../../lib/components';
 
 interface GradeEntry {
   id: string;
@@ -13,157 +27,394 @@ interface GradeEntry {
   overall_gpa: number | null;
   term: string;
   created_at: string;
+  score: number | null;
+  max_score: number | null;
   class?: { name: string; grade_level: string };
 }
+
+interface TimetableEntry {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  room: string;
+  subject?: { name: string };
+  teacher?: { full_name: string };
+}
+
+function parseTime(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+function formatTime(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hr = h % 12 || 12;
+  return `${hr}:${String(m || 0).padStart(2, '0')} ${ampm}`;
+}
+
+const gradeColor = (pct: number) => {
+  if (pct >= 80) return COLORS.chalk;
+  if (pct >= 60) return COLORS.pencil;
+  if (pct >= 40) return COLORS.blue;
+  return COLORS.danger;
+};
 
 export default function StudentGradesScreen() {
   const { user } = useAuth();
   const [grades, setGrades] = useState<GradeEntry[]>([]);
+  const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'schedule' | 'grades'>('schedule');
 
-  const fetchGrades = async (isRefresh = false) => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     if (!user?.id) return;
     if (!isRefresh) setLoading(true);
-    let q = supabase
-      .from('grade_entries')
-      .select('id, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term, created_at, class:classes(name, grade_level)')
-      .eq('student_id', user.id)
-      .order('created_at', { ascending: false });
-    if (selectedTerm) q = q.eq('term', selectedTerm);
-    const { data } = await q;
-    if (data) setGrades(data as unknown as GradeEntry[]);
-    setLoading(false);
-  };
 
-  useEffect(() => { fetchGrades(); }, [user?.id, selectedTerm]);
+    const { data: enrollments } = await supabase
+      .from('class_enrollments')
+      .select('class_id')
+      .eq('student_id', user.id);
+
+    const classIds = enrollments?.map((e) => e.class_id) || [];
+
+    const [gradeRes, ttRes] = await Promise.all([
+      supabase
+        .from('grade_entries')
+        .select('id, subject_name, grade_letter, practical_grade, subject_gpa, overall_gpa, term, created_at, score, max_score, class:classes(name, grade_level)')
+        .eq('student_id', user.id)
+        .order('created_at', { ascending: false }),
+      classIds.length > 0
+        ? supabase
+            .from('timetable')
+            .select('id, day_of_week, start_time, end_time, room, subject:subjects(name), teacher:profiles(full_name)')
+            .in('class_id', classIds)
+            .order('day_of_week')
+            .order('start_time')
+        : { data: [] },
+    ]);
+
+    if (gradeRes.data) {
+      setGrades(gradeRes.data as unknown as GradeEntry[]);
+    }
+    if (ttRes.data) {
+      setTimetable(
+        ttRes.data.map((e: any) => ({
+          ...e,
+          subject: Array.isArray(e.subject) ? e.subject[0] : e.subject,
+          teacher: Array.isArray(e.teacher) ? e.teacher[0] : e.teacher,
+        }))
+      );
+    }
+    setLoading(false);
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchGrades(true);
+    await fetchData(true);
     setRefreshing(false);
   };
 
-  const getUniqueTerms = () => {
-    return Array.from(new Set(grades.map(g => g.term))).sort((a, b) => b.localeCompare(a));
-  };
+  const today = new Date();
+  const currentDay = today.getDay();
+  const todayEntries = timetable
+    .filter((e) => e.day_of_week === currentDay)
+    .sort((a, b) => parseTime(a.start_time) - parseTime(b.start_time));
 
-  const getOverallGpa = () => {
-    const withGpa = grades.filter(g => g.overall_gpa != null);
-    if (withGpa.length === 0) return null;
-    return withGpa[0].overall_gpa;
-  };
+  const todayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][currentDay];
 
-  const gpaColor = (g: number) => g >= 3.5 ? COLORS.success : g >= 2.5 ? COLORS.warning : COLORS.danger;
-
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
-
-  const overallGpa = getOverallGpa();
+  if (loading) return <LoadingScreen text="Loading..." />;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.headerTitle}>Grades</Text>
-
-      {overallGpa != null && (
-        <View style={styles.summaryCard}>
-          <Text style={styles.gpaLabel}>Overall GPA</Text>
-          <Text style={[styles.gpaValue, { color: gpaColor(overallGpa) }]}>{Number(overallGpa).toFixed(1)}</Text>
-          <Text style={styles.gpaSubLabel}>/ 4.0</Text>
-        </View>
-      )}
-
-      {getUniqueTerms().length > 0 && (
-        <View style={styles.termRow}>
-          <TouchableOpacity style={[styles.termPill, !selectedTerm && styles.termPillActive]} onPress={() => setSelectedTerm(null)}>
-            <Text style={[styles.termPillText, !selectedTerm && styles.termPillTextActive]}>All</Text>
-          </TouchableOpacity>
-          {getUniqueTerms().map(term => (
-            <TouchableOpacity key={term} style={[styles.termPill, selectedTerm === term && styles.termPillActive]} onPress={() => setSelectedTerm(term)}>
-              <Text style={[styles.termPillText, selectedTerm === term && styles.termPillTextActive]}>{term}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {grades.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No grades yet</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={grades}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          renderItem={({ item }) => {
-            const className = Array.isArray(item.class) ? item.class[0]?.name : item.class?.name;
-            return (
-              <View style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{item.subject_name ?? 'Subject'}</Text>
-                    <Text style={styles.cardMeta}>{className} · {item.term}</Text>
-                  </View>
-                  {item.subject_gpa != null && (
-                    <Text style={[styles.gpaBadge, { color: gpaColor(item.subject_gpa) }]}>{Number(item.subject_gpa).toFixed(1)} GPA</Text>
-                  )}
-                </View>
-                <View style={styles.gradesRow}>
-                  <View style={styles.gradeCol}>
-                    <Text style={styles.gradeLabel}>Theory</Text>
-                    <Text style={styles.gradeValue}>{item.grade_letter ?? '—'}</Text>
-                  </View>
-                  <View style={styles.gradeDivider} />
-                  <View style={styles.gradeCol}>
-                    <Text style={styles.gradeLabel}>Practical</Text>
-                    <Text style={styles.gradeValue}>{item.practical_grade ?? '—'}</Text>
-                  </View>
-                </View>
-              </View>
-            );
-          }}
+          tintColor={COLORS.tape}
+          colors={[COLORS.tape]}
         />
-      )}
-    </View>
+      }
+    >
+      <ScreenHeader title="Classes" subtitle={todayName} />
+
+      <View style={styles.body}>
+        <View style={styles.toggleRow}>
+          <TouchableOpacity
+            style={[styles.togglePill, viewMode === 'schedule' && styles.togglePillActive]}
+            activeOpacity={0.7}
+            onPress={() => setViewMode('schedule')}
+          >
+            <Text style={[styles.toggleText, viewMode === 'schedule' && styles.toggleTextActive]}>
+              Schedule
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.togglePill, viewMode === 'grades' && styles.togglePillActive]}
+            activeOpacity={0.7}
+            onPress={() => setViewMode('grades')}
+          >
+            <Text style={[styles.toggleText, viewMode === 'grades' && styles.toggleTextActive]}>
+              Grades
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {viewMode === 'schedule' ? (
+          <>
+            {todayEntries.length === 0 ? (
+              <NotebookCard>
+                <EmptyState
+                  icon="📅"
+                  title="No classes today"
+                  subtitle="No classes scheduled for today"
+                />
+              </NotebookCard>
+            ) : (
+              todayEntries.map((entry, i) => (
+                <NotebookCard key={entry.id} accent={COLORS.chalk}>
+                  <View style={styles.entryRow}>
+                    <View style={styles.periodBadge}>
+                      <Text style={styles.periodText}>{i + 1}</Text>
+                    </View>
+                    <View style={styles.entryInfo}>
+                      <Text style={styles.subjectName}>
+                        {entry.subject?.name || 'Subject'}
+                      </Text>
+                      {entry.teacher && (
+                        <Text style={styles.teacherName}>
+                          {entry.teacher.full_name}
+                        </Text>
+                      )}
+                      {entry.room && (
+                        <Text style={styles.roomName}>Room {entry.room}</Text>
+                      )}
+                    </View>
+                    <View style={styles.timeBlock}>
+                      <Text style={styles.timeText}>{formatTime(entry.start_time)}</Text>
+                      <Text style={styles.timeSep}>–</Text>
+                      <Text style={styles.timeText}>{formatTime(entry.end_time)}</Text>
+                    </View>
+                  </View>
+                </NotebookCard>
+              ))
+            )}
+          </>
+        ) : (
+          <>
+            {grades.length === 0 ? (
+              <NotebookCard>
+                <EmptyState
+                  icon="📊"
+                  title="No grades yet"
+                  subtitle="Grades will appear here"
+                />
+              </NotebookCard>
+            ) : (
+              grades.map((grade) => {
+                const pct =
+                  grade.score != null && grade.max_score != null
+                    ? Math.round((grade.score / grade.max_score) * 100)
+                    : grade.subject_gpa != null
+                    ? Math.round((grade.subject_gpa / 4) * 100)
+                    : 0;
+                const c = gradeColor(pct);
+                const className = Array.isArray(grade.class)
+                  ? grade.class[0]?.name
+                  : grade.class?.name;
+
+                return (
+                  <NotebookCard key={grade.id}>
+                    <View style={styles.gradeCard}>
+                      <View style={[styles.gradeSquare, { borderColor: c }]}>
+                        <Text style={[styles.gradeLetter, { color: c }]}>
+                          {grade.grade_letter || '—'}
+                        </Text>
+                      </View>
+                      <View style={styles.gradeInfo}>
+                        <Text style={styles.gradeSubject}>
+                          {grade.subject_name || 'Subject'}
+                        </Text>
+                        {className && (
+                          <Text style={styles.gradeClass}>{className}</Text>
+                        )}
+                        <Text style={styles.gradeTerm}>{grade.term}</Text>
+                        <View style={styles.progressBar}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              {
+                                width: `${Math.min(pct, 100)}%`,
+                                backgroundColor: c,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.gradePercent, { color: c }]}>
+                          {pct}%
+                        </Text>
+                      </View>
+                    </View>
+                  </NotebookCard>
+                );
+              })
+            )}
+          </>
+        )}
+
+        <View style={{ height: 24 }} />
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: COLORS.text, letterSpacing: -0.5, marginBottom: 20 },
-
-  summaryCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-    alignItems: 'center',
-    ...SHADOWS.md,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.paper,
   },
-  gpaLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
-  gpaValue: { fontSize: 52, fontWeight: '800', marginTop: 4 },
-  gpaSubLabel: { fontSize: 15, color: COLORS.textSecondary, marginTop: 2 },
+  body: {
+    padding: 20,
+  },
 
-  termRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  termPill: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  termPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  termPillText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
-  termPillTextActive: { color: COLORS.textInverse },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  togglePill: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.white,
+  },
+  togglePillActive: {
+    backgroundColor: COLORS.cover,
+    borderColor: COLORS.cover,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.graphite,
+  },
+  toggleTextActive: {
+    color: COLORS.paper,
+  },
 
-  emptyContainer: { alignItems: 'center', marginTop: 40 },
-  emptyText: { color: COLORS.textTertiary, fontSize: 15 },
+  entryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  periodBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: COLORS.chalkSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  periodText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.chalk,
+  },
+  entryInfo: {
+    flex: 1,
+  },
+  subjectName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.ink,
+    marginBottom: 2,
+  },
+  teacherName: {
+    fontSize: 13,
+    color: COLORS.graphite,
+  },
+  roomName: {
+    fontSize: 12,
+    color: COLORS.graphiteLight,
+    marginTop: 2,
+  },
+  timeBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.paperDim,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  timeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.graphite,
+  },
+  timeSep: {
+    fontSize: 11,
+    color: COLORS.graphiteLight,
+    marginHorizontal: 3,
+  },
 
-  card: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 10, ...SHADOWS.sm },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
-  cardMeta: { fontSize: 13, color: COLORS.textSecondary },
-  gpaBadge: { fontSize: 15, fontWeight: '800' },
-  gradesRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surfaceAlt, borderRadius: 10, paddingVertical: 10 },
-  gradeCol: { flex: 1, alignItems: 'center' },
-  gradeLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  gradeValue: { fontSize: 18, fontWeight: '800', color: COLORS.text },
-  gradeDivider: { width: 1, height: 32, backgroundColor: COLORS.border },
+  gradeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gradeSquare: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    marginRight: 14,
+  },
+  gradeLetter: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  gradeInfo: {
+    flex: 1,
+  },
+  gradeSubject: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.ink,
+    marginBottom: 2,
+  },
+  gradeClass: {
+    fontSize: 12,
+    color: COLORS.graphite,
+  },
+  gradeTerm: {
+    fontSize: 11,
+    color: COLORS.graphiteLight,
+    marginBottom: 6,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: COLORS.paperDim,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  gradePercent: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

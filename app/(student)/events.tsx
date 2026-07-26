@@ -1,9 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
-import { PageHeader, Card, Badge, EmptyState, LoadingScreen } from '../../lib/components';
+import {
+  ScreenHeader,
+  NotebookCard,
+  CatPill,
+  EmptyState,
+  LoadingScreen,
+} from '../../lib/components';
 
 interface SchoolEvent {
   id: string;
@@ -15,21 +28,45 @@ interface SchoolEvent {
   event_type: 'event' | 'holiday' | 'exam' | 'meeting' | 'activity';
 }
 
-const EVENT_COLORS: Record<string, string> = {
-  event: COLORS.primary,
-  holiday: COLORS.success,
+const EVENT_ACCENT: Record<string, string> = {
+  event: COLORS.tape,
+  holiday: COLORS.chalk,
   exam: COLORS.danger,
-  meeting: COLORS.warning,
-  activity: COLORS.primary,
+  meeting: COLORS.pencil,
+  activity: COLORS.blue,
 };
+
+function getWeekDates() {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+
+  const dates: { label: string; date: number; full: Date; dayIdx: number }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    dates.push({
+      label: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()],
+      date: d.getDate(),
+      full: d,
+      dayIdx: d.getDay(),
+    });
+  }
+  return dates;
+}
 
 export default function StudentEventsScreen() {
   const { user } = useAuth();
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const fetchData = async (isRefresh = false) => {
+  const weekDates = getWeekDates();
+  const today = new Date();
+
+  const fetchData = useCallback(async (isRefresh = false) => {
     if (!user?.id) return;
     if (!isRefresh) setLoading(true);
 
@@ -40,11 +77,11 @@ export default function StudentEventsScreen() {
 
     if (data) setEvents(data as SchoolEvent[]);
     setLoading(false);
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     fetchData();
-  }, [user?.id]);
+  }, [fetchData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -52,136 +89,191 @@ export default function StudentEventsScreen() {
     setRefreshing(false);
   };
 
-  const today = new Date(new Date().toDateString());
-  const upcoming = events.filter((e) => new Date(e.event_date) >= today);
-  const past = events.filter((e) => new Date(e.event_date) < today);
+  const selectedDateStr = selectedDate.toISOString().split('T')[0];
+  const dayEvents = events.filter((e) => e.event_date === selectedDateStr);
 
-  const formatEventDate = (d: string) => {
-    return new Date(d).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
+  const formatEventDate = (d: string) =>
+    new Date(d).toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
       day: 'numeric',
       year: 'numeric',
     });
-  };
-
-  const daysUntil = (d: string) => {
-    const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
-    if (diff < 0) return null;
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Tomorrow';
-    return `${diff}d`;
-  };
-
-  const renderEvent = (item: SchoolEvent, isPast = false) => {
-    const c = EVENT_COLORS[item.event_type] || COLORS.primary;
-    const d = daysUntil(item.event_date);
-
-    return (
-      <Card key={item.id} style={{ ...styles.eventCard, ...(isPast ? styles.eventCardPast : {}) }}>
-        <View style={styles.eventTop}>
-          <View style={[styles.eventTypeDot, { backgroundColor: c }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.eventTitle, isPast && styles.eventTitlePast]}>{item.title}</Text>
-            <Text style={styles.eventType}>{item.event_type.charAt(0).toUpperCase() + item.event_type.slice(1)}</Text>
-          </View>
-          <Badge
-            text={item.event_type}
-            color={c}
-          />
-        </View>
-
-        {item.description ? (
-          <Text style={[styles.eventDesc, isPast && styles.eventDescPast]} numberOfLines={2}>{item.description}</Text>
-        ) : null}
-
-        <View style={styles.eventFooter}>
-          <View style={styles.eventDateRow}>
-            <Text style={styles.eventDateIcon}>📅</Text>
-            <Text style={[styles.eventDate, isPast && styles.eventDatePast]}>{formatEventDate(item.event_date)}</Text>
-          </View>
-          {item.event_time && (
-            <View style={styles.eventDateRow}>
-              <Text style={styles.eventDateIcon}>🕐</Text>
-              <Text style={[styles.eventDate, isPast && styles.eventDatePast]}>{item.event_time}</Text>
-            </View>
-          )}
-        </View>
-
-        {d !== null && !isPast && (
-          <View style={[styles.countdownBadge, { backgroundColor: c + '15' }]}>
-            <Text style={[styles.countdownText, { color: c }]}>{d}</Text>
-          </View>
-        )}
-      </Card>
-    );
-  };
 
   if (loading) return <LoadingScreen text="Loading events..." />;
 
   return (
-    <FlatList
+    <ScrollView
       style={styles.container}
-      data={[]}
-      renderItem={null}
-      ListHeaderComponent={
-        <View>
-          <PageHeader title="Events" subtitle={`${upcoming.length} upcoming`} />
-
-          {upcoming.length === 0 && past.length === 0 ? (
-            <EmptyState icon="📅" title="No events" subtitle="No school events scheduled" />
-          ) : (
-            <>
-              {upcoming.length > 0 && (
-                <>
-                  <Text style={styles.sectionTitle}>Upcoming Events</Text>
-                  {upcoming.map((item) => renderEvent(item))}
-                </>
-              )}
-
-              {past.length > 0 && (
-                <>
-                  <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Past Events</Text>
-                  {past.map((item) => renderEvent(item, true))}
-                </>
-              )}
-            </>
-          )}
-
-          <View style={{ height: 24 }} />
-        </View>
-      }
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
-    />
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={COLORS.tape}
+          colors={[COLORS.tape]}
+        />
+      }
+    >
+      <ScreenHeader title="Calendar" />
+
+      <View style={styles.body}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.weekPicker}
+          contentContainerStyle={styles.weekPickerContent}
+        >
+          {weekDates.map((day) => {
+            const isActive =
+              day.full.toISOString().split('T')[0] === selectedDateStr;
+            const isToday =
+              day.full.toDateString() === today.toDateString();
+            return (
+              <TouchableOpacity
+                key={day.dayIdx}
+                style={[styles.dayPill, isActive && styles.dayPillActive]}
+                activeOpacity={0.7}
+                onPress={() => setSelectedDate(day.full)}
+              >
+                <Text style={[styles.dayLabel, isActive && styles.dayLabelActive]}>
+                  {day.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.dayDate,
+                    isActive && styles.dayDateActive,
+                    isToday && !isActive && styles.dayDateHighlight,
+                  ]}
+                >
+                  {day.date}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <Text style={styles.selectedDateText}>
+          {formatEventDate(selectedDateStr)}
+        </Text>
+
+        {dayEvents.length === 0 ? (
+          <NotebookCard>
+            <EmptyState
+              icon="📅"
+              title="No events"
+              subtitle="Nothing scheduled for this day"
+            />
+          </NotebookCard>
+        ) : (
+          dayEvents.map((event) => {
+            const accent = EVENT_ACCENT[event.event_type] || COLORS.tape;
+            return (
+              <NotebookCard key={event.id} accent={accent}>
+                <View style={styles.eventRow}>
+                  <View style={styles.eventInfo}>
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    {event.event_time && (
+                      <Text style={styles.eventTime}>{event.event_time}</Text>
+                    )}
+                    {event.description ? (
+                      <Text style={styles.eventDesc} numberOfLines={2}>
+                        {event.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <CatPill category={event.event_type} />
+                </View>
+              </NotebookCard>
+            );
+          })
+        )}
+
+        <View style={{ height: 24 }} />
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
-
-  eventCard: { borderLeftWidth: 4, borderLeftColor: COLORS.primary },
-  eventCardPast: { opacity: 0.6 },
-  eventTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
-  eventTypeDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10, marginTop: 4 },
-  eventTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
-  eventTitlePast: { color: COLORS.textSecondary },
-  eventType: { fontSize: 12, color: COLORS.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
-  eventDesc: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 20, marginBottom: 12 },
-  eventDescPast: { color: COLORS.textTertiary },
-  eventFooter: { flexDirection: 'row', gap: 16 },
-  eventDateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  eventDateIcon: { fontSize: 12 },
-  eventDate: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '500' },
-  eventDatePast: { color: COLORS.textTertiary },
-  countdownBadge: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.paper,
   },
-  countdownText: { fontSize: 12, fontWeight: '700' },
+  body: {
+    padding: 20,
+  },
+
+  weekPicker: {
+    marginBottom: 12,
+  },
+  weekPickerContent: {
+    gap: 8,
+  },
+  dayPill: {
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.white,
+    minWidth: 56,
+  },
+  dayPillActive: {
+    backgroundColor: COLORS.cover,
+    borderColor: COLORS.cover,
+  },
+  dayLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.graphite,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  dayLabelActive: {
+    color: COLORS.paper,
+  },
+  dayDate: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
+  dayDateActive: {
+    color: COLORS.paper,
+  },
+  dayDateHighlight: {
+    color: COLORS.tape,
+  },
+
+  selectedDateText: {
+    fontSize: 13,
+    color: COLORS.graphite,
+    marginBottom: 16,
+    fontWeight: '600',
+  },
+
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  eventInfo: {
+    flex: 1,
+  },
+  eventTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.ink,
+    marginBottom: 2,
+  },
+  eventTime: {
+    fontSize: 13,
+    color: COLORS.graphite,
+    marginBottom: 4,
+  },
+  eventDesc: {
+    fontSize: 13,
+    color: COLORS.graphiteLight,
+    lineHeight: 18,
+  },
 });

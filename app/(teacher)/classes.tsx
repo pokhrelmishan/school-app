@@ -1,15 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { supabase } from '../../lib/supabase';
+import { COLORS } from '../../lib/theme';
+import { useAuth } from '../../lib/auth';
+import {
+  ScreenHeader,
+  NotebookCard,
+  Badge,
+  EmptyState,
+  LoadingScreen,
+  SectionHeader,
+} from '../../lib/components';
 
 interface ClassItem {
   id: string;
@@ -17,35 +25,24 @@ interface ClassItem {
   grade_level: string;
   role: 'class_teacher' | 'subject';
   subject_name?: string;
+  student_count: number;
 }
 
 export default function TeacherClassesScreen() {
+  const { user } = useAuth();
   const router = useRouter();
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchClasses();
-  }, []);
+  const fetchClasses = useCallback(async () => {
+    if (!user?.id) return;
 
-  const fetchClasses = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-
-      const classTeacherRes = await supabase
-        .from('classes')
-        .select('id, name, grade_level')
-        .eq('teacher_id', user.id);
-
-      const subjectRes = await supabase
-        .from('teacher_subjects')
-        .select('class_id, classes(id, name, grade_level), subjects(name)')
-        .eq('teacher_id', user.id);
+      const [classTeacherRes, subjectRes] = await Promise.all([
+        supabase.from('classes').select('id, name, grade_level').eq('teacher_id', user.id),
+        supabase.from('teacher_subjects').select('class_id, classes(id, name, grade_level), subjects(name)').eq('teacher_id', user.id),
+      ]);
 
       const classTeacherIds = new Set<string>();
       const merged: ClassItem[] = [];
@@ -58,6 +55,7 @@ export default function TeacherClassesScreen() {
             name: c.name,
             grade_level: c.grade_level,
             role: 'class_teacher',
+            student_count: 0,
           });
         }
       }
@@ -75,6 +73,7 @@ export default function TeacherClassesScreen() {
               grade_level: classInfo.grade_level,
               role: 'subject',
               subject_name: subjectInfo?.name,
+              student_count: 0,
             });
           } else {
             const existing = merged.find((m) => m.id === s.class_id);
@@ -85,184 +84,104 @@ export default function TeacherClassesScreen() {
         }
       }
 
+      if (merged.length > 0) {
+        const counts = await Promise.all(
+          merged.map(async (c) => {
+            const { count } = await supabase
+              .from('class_enrollments')
+              .select('*', { count: 'exact', head: true })
+              .eq('class_id', c.id);
+            return { id: c.id, count: count ?? 0 };
+          })
+        );
+        counts.forEach(({ id, count }) => {
+          const cls = merged.find((m) => m.id === id);
+          if (cls) cls.student_count = count;
+        });
+      }
+
       setClasses(merged);
     } catch (err) {
       console.error('Error fetching classes:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [user?.id]);
 
-  const handleProfilePress = () => {
-    router.push('/(teacher)/profile' as any);
-  };
+  useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
-  const renderItem = ({ item }: { item: ClassItem }) => {
-    const isClassTeacher = item.role === 'class_teacher';
-    const accentColor = isClassTeacher ? COLORS.primary : COLORS.success;
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchClasses();
+  }, [fetchClasses]);
 
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.7}
-        onPress={() => router.push(`/(teacher)/class/${item.id}` as any)}
-      >
-        <View style={[styles.accent, { backgroundColor: accentColor }]} />
-        <View style={styles.cardBody}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.className}>{item.name}</Text>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: isClassTeacher ? COLORS.primary + '18' : COLORS.success + '18' },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: isClassTeacher ? COLORS.primary : COLORS.success },
-                ]}
-              >
-                {isClassTeacher ? 'Class Teacher' : `Subject: ${item.subject_name}`}
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.gradeLevel}>Grade {item.grade_level}</Text>
-        </View>
-        <Text style={[styles.chevron, { color: COLORS.textSecondary || '#888', fontSize: 20 }]}>➡️</Text>
-      </TouchableOpacity>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  if (loading) return <LoadingScreen text="Loading classes..." />;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>My Classes</Text>
-        <TouchableOpacity onPress={handleProfilePress} style={styles.avatarBtn}>
-          <Text style={{ fontSize: 32, color: COLORS.primary }}>👤</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.root}>
+      <ScreenHeader title="Classes" subtitle={user?.id ? 'Teacher' : ''} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} />}
+      >
+        {classes.length === 0 ? (
+          <EmptyState
+            icon="📚"
+            title="No Classes Found"
+            subtitle="You are not associated with any classes yet."
+          />
+        ) : (
+          <>
+            <SectionHeader title={`${classes.length} Class${classes.length !== 1 ? 'es' : ''}`} />
+            {classes.map((item) => {
+              const isClassTeacher = item.role === 'class_teacher';
+              const accentColor = isClassTeacher ? COLORS.chalk : COLORS.tape;
 
-      {classes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={{ fontSize: 64, color: COLORS.textSecondary || '#bbb' }}>📚</Text>
-          <Text style={styles.emptyTitle}>No Classes Found</Text>
-          <Text style={styles.emptySubtitle}>
-            You are not associated with any classes yet.
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={classes}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+              return (
+                <NotebookCard
+                  key={item.id}
+                  accent={accentColor}
+                  onPress={() => router.push(`/(teacher)/class/${item.id}` as any)}
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.className}>{item.name}</Text>
+                    <Badge
+                      text={isClassTeacher ? 'Class Teacher' : `Subject: ${item.subject_name}`}
+                      color={isClassTeacher ? COLORS.chalk : COLORS.tape}
+                    />
+                  </View>
+                  <View style={styles.cardMeta}>
+                    <Text style={styles.gradeLevel}>Grade {item.grade_level}</Text>
+                    <Text style={styles.studentCount}>{item.student_count} students</Text>
+                  </View>
+                </NotebookCard>
+              );
+            })}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    padding: 20,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.bg,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: COLORS.text || '#1a1a2e',
-  },
-  avatarBtn: {
-    padding: 4,
-  },
-  list: {
-    paddingBottom: 20,
-  },
-  card: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-    overflow: 'hidden',
-    ...SHADOWS.sm,
-  },
-  accent: {
-    width: 4,
-    height: '100%',
-    borderRadius: 2,
-    marginRight: 12,
-  },
-  cardBody: {
-    flex: 1,
-  },
+  root: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.paper, padding: 20 },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  className: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: COLORS.text || '#1a1a2e',
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  gradeLevel: {
-    fontSize: 13,
-    color: COLORS.textSecondary || '#888',
-    marginTop: 4,
-  },
-  chevron: {
-    marginLeft: 8,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
+  className: { fontSize: 17, fontWeight: '700', color: COLORS.ink },
+  cardMeta: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.text || '#1a1a2e',
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary || '#888',
-    marginTop: 8,
-    textAlign: 'center',
-  },
+  gradeLevel: { fontSize: 13, color: COLORS.graphite },
+  studentCount: { fontSize: 13, color: COLORS.graphiteLight },
 });

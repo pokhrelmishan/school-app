@@ -9,10 +9,18 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { COLORS, SHADOWS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import {
+  ScreenHeader,
+  NotebookCard,
+  Avatar,
+  EmptyState,
+  LoadingScreen,
+} from '../../lib/components';
 
 interface Message {
   id: string;
@@ -34,22 +42,21 @@ function timeAgo(dateStr: string) {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diffSec = Math.floor((now - then) / 1000);
-  if (diffSec < 60) return 'just now';
+  if (diffSec < 60) return 'now';
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 60) return `${diffMin}m`;
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffHr < 24) return `${diffHr}h`;
   const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
+  if (diffDay < 7) return `${diffDay}d`;
   return new Date(dateStr).toLocaleDateString();
 }
 
 export default function StudentMessagesScreen() {
   const { user, profile } = useAuth();
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [refreshing, setRefreshing] = useState(false);
   const [composing, setComposing] = useState(false);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedRecipient, setSelectedRecipient] = useState<Teacher | null>(null);
@@ -71,7 +78,6 @@ export default function StudentMessagesScreen() {
       if (error) throw error;
 
       const msgs = data || [];
-
       const otherIds = new Set<string>();
       msgs.forEach((m: Message) => {
         if (m.sender_id !== user.id) otherIds.add(m.sender_id);
@@ -109,6 +115,12 @@ export default function StudentMessagesScreen() {
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchMessages();
+    setRefreshing(false);
+  };
 
   const fetchTeachers = async () => {
     if (!user?.id) return;
@@ -208,162 +220,170 @@ export default function StudentMessagesScreen() {
     t.full_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isSent = item.sender_id === user?.id;
-    const otherName = isSent ? item.recipient_name : item.sender_name;
-    const preview = item.body.length > 80 ? item.body.slice(0, 80) + '...' : item.body;
+  if (loading) return <LoadingScreen text="Loading messages..." />;
 
+  if (composing) {
     return (
-      <TouchableOpacity style={styles.msgCard} activeOpacity={0.7}>
-        <View style={styles.msgLeft}>
-          <View style={[styles.msgAvatar, isSent && styles.msgAvatarSent]}>
-            <Text style={[styles.msgAvatarText, isSent && styles.msgAvatarTextSent]}>
-              {(otherName || '?')[0]}
-            </Text>
+      <View style={styles.container}>
+        <ScreenHeader title="New Message" />
+        <KeyboardAvoidingView
+          style={styles.composeContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.body}>
+            {!selectedRecipient ? (
+              <>
+                <TouchableOpacity
+                  style={styles.closeBtn}
+                  activeOpacity={0.7}
+                  onPress={() => setComposing(false)}
+                >
+                  <Text style={styles.closeBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search teachers..."
+                  placeholderTextColor={COLORS.graphiteLight}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {filteredTeachers.length === 0 ? (
+                  <NotebookCard>
+                    <EmptyState
+                      icon="👩‍🏫"
+                      title="No teachers found"
+                      subtitle="No teachers in your classes"
+                    />
+                  </NotebookCard>
+                ) : (
+                  filteredTeachers.map((t) => (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={styles.teacherRow}
+                      activeOpacity={0.7}
+                      onPress={() => setSelectedRecipient(t)}
+                    >
+                      <Avatar name={t.full_name} size={38} color={COLORS.tape} />
+                      <View style={styles.teacherInfo}>
+                        <Text style={styles.teacherName}>{t.full_name}</Text>
+                        <Text style={styles.teacherRole}>{t.role_label}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </>
+            ) : (
+              <>
+                <View style={styles.composeHeader}>
+                  <TouchableOpacity
+                    onPress={() => setSelectedRecipient(null)}
+                    style={styles.backBtn}
+                  >
+                    <Text style={styles.backBtnText}>← Back</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.composeTo} numberOfLines={1}>
+                    To: {selectedRecipient.full_name}
+                  </Text>
+                  <TouchableOpacity onPress={() => setComposing(false)}>
+                    <Text style={styles.closeBtnText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.bodyInput}
+                  placeholder="Type your message..."
+                  placeholderTextColor={COLORS.graphiteLight}
+                  value={messageBody}
+                  onChangeText={setMessageBody}
+                  multiline
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.sendBtn,
+                    (!messageBody.trim() || sending) && styles.sendBtnDisabled,
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={handleSend}
+                  disabled={!messageBody.trim() || sending}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color={COLORS.paper} />
+                  ) : (
+                    <Text style={styles.sendBtnText}>Send</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-          <View style={styles.msgContent}>
-            <View style={styles.msgTopRow}>
-              <Text style={styles.msgName} numberOfLines={1}>
-                {isSent ? `To: ${otherName}` : otherName}
-              </Text>
-              <Text style={styles.msgTime}>{timeAgo(item.created_at)}</Text>
-            </View>
-            <Text style={styles.msgPreview} numberOfLines={2}>
-              {preview}
-            </Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        </KeyboardAvoidingView>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
+      <ScreenHeader title="Messages" />
+      <View style={styles.body}>
+        <FlatList
+          data={messages}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.tape}
+              colors={[COLORS.tape]}
+            />
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon="✉️"
+              title="No Messages"
+              subtitle="Tap the button below to message a teacher"
+            />
+          }
+          renderItem={({ item }) => {
+            const isSent = item.sender_id === user?.id;
+            const otherName = isSent ? item.recipient_name : item.sender_name;
+            const preview =
+              item.body.length > 80 ? item.body.slice(0, 80) + '...' : item.body;
+
+            return (
+              <NotebookCard>
+                <View style={styles.msgRow}>
+                  <Avatar
+                    name={otherName || '?'}
+                    size={40}
+                    color={isSent ? COLORS.chalk : COLORS.tape}
+                  />
+                  <View style={styles.msgContent}>
+                    <View style={styles.msgTopRow}>
+                      <Text style={styles.msgName} numberOfLines={1}>
+                        {isSent ? `To: ${otherName}` : otherName}
+                      </Text>
+                      <Text style={styles.msgTime}>{timeAgo(item.created_at)}</Text>
+                    </View>
+                    <Text style={styles.msgPreview} numberOfLines={2}>
+                      {preview}
+                    </Text>
+                  </View>
+                </View>
+              </NotebookCard>
+            );
+          }}
+        />
       </View>
 
-      {composing ? (
-        <KeyboardAvoidingView
-          style={styles.composeContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          {!selectedRecipient ? (
-            <View style={styles.pickerSection}>
-              <View style={styles.pickerHeader}>
-                <Text style={styles.pickerTitle}>Select Teacher</Text>
-                <TouchableOpacity onPress={() => setComposing(false)}>
-                  <Text style={{ fontSize: 24, color: COLORS.textSecondary }}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search teachers..."
-                placeholderTextColor={COLORS.textTertiary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              <FlatList
-                data={filteredTeachers}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item: t }) => (
-                  <TouchableOpacity
-                    style={styles.teacherRow}
-                    activeOpacity={0.7}
-                    onPress={() => setSelectedRecipient(t)}
-                  >
-                    <View style={styles.teacherAvatar}>
-                      <Text style={styles.teacherAvatarText}>{t.full_name[0]}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.teacherName}>{t.full_name}</Text>
-                      <Text style={styles.teacherRole}>{t.role_label}</Text>
-                    </View>
-                    <Text style={{ fontSize: 18, color: COLORS.textTertiary }}>➡️</Text>
-                  </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                  <Text style={styles.emptyText}>No teachers found in your classes</Text>
-                }
-              />
-            </View>
-          ) : (
-            <View style={styles.composeSection}>
-              <View style={styles.composeHeader}>
-                <TouchableOpacity
-                  onPress={() => setSelectedRecipient(null)}
-                  style={styles.backBtn}
-                >
-                  <Text style={{ fontSize: 22, color: COLORS.primary }}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.composeTo} numberOfLines={1}>
-                  To: {selectedRecipient.full_name}
-                </Text>
-                <TouchableOpacity onPress={() => setComposing(false)}>
-                  <Text style={{ fontSize: 24, color: COLORS.textSecondary }}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                style={styles.bodyInput}
-                placeholder="Type your message..."
-                placeholderTextColor={COLORS.textTertiary}
-                value={messageBody}
-                onChangeText={setMessageBody}
-                multiline
-                numberOfLines={5}
-                textAlignVertical="top"
-              />
-              <TouchableOpacity
-                style={[
-                  styles.sendBtn,
-                  (!messageBody.trim() || sending) && styles.sendBtnDisabled,
-                ]}
-                activeOpacity={0.7}
-                onPress={handleSend}
-                disabled={!messageBody.trim() || sending}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color={COLORS.textInverse} />
-                ) : (
-                  <Text style={styles.sendBtnText}>Send</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-        </KeyboardAvoidingView>
-      ) : (
-        <>
-          {messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={{ fontSize: 64, color: COLORS.textTertiary }}>💬</Text>
-              <Text style={styles.emptyTitle}>No Messages</Text>
-              <Text style={styles.emptySubtitle}>
-                Tap the button below to message a teacher.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={messages}
-              keyExtractor={(item) => item.id}
-              renderItem={renderMessage}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-
-          <TouchableOpacity style={styles.fab} activeOpacity={0.8} onPress={handleOpenCompose}>
-            <Text style={{ fontSize: 28, color: COLORS.textInverse }}>✉️</Text>
-          </TouchableOpacity>
-        </>
-      )}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={handleOpenCompose}
+      >
+        <Text style={styles.fabText}>✏️</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -371,68 +391,120 @@ export default function StudentMessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.paper,
+  },
+  body: {
+    flex: 1,
     padding: 20,
   },
-  center: {
+  composeContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.bg,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: COLORS.text,
-    letterSpacing: -0.5,
-  },
-
   list: {
     paddingBottom: 80,
   },
-  msgCard: {
-    backgroundColor: COLORS.surface,
+
+  closeBtn: {
+    alignSelf: 'flex-end',
+    marginBottom: 12,
+  },
+  closeBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.tape,
+  },
+
+  searchInput: {
+    backgroundColor: COLORS.white,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: COLORS.ink,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    marginBottom: 12,
+  },
+
+  teacherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  teacherInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  teacherName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.ink,
+  },
+  teacherRole: {
+    fontSize: 12,
+    color: COLORS.graphiteLight,
+    marginTop: 2,
+  },
+
+  composeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  backBtn: {
+    marginRight: 10,
+  },
+  backBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.tape,
+  },
+  composeTo: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.ink,
+  },
+
+  bodyInput: {
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 14,
-    marginBottom: 8,
-    flexDirection: 'row',
+    fontSize: 15,
+    color: COLORS.ink,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    minHeight: 120,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+
+  sendBtn: {
+    backgroundColor: COLORS.cover,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    ...SHADOWS.sm,
   },
-  msgLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  sendBtnDisabled: {
+    opacity: 0.5,
   },
-  msgAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  msgAvatarSent: {
-    backgroundColor: COLORS.successBg,
-  },
-  msgAvatarText: {
+  sendBtnText: {
+    color: COLORS.paper,
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.primary,
   },
-  msgAvatarTextSent: {
-    color: COLORS.success,
+
+  msgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   msgContent: {
     flex: 1,
+    marginLeft: 12,
   },
   msgTopRow: {
     flexDirection: 'row',
@@ -443,17 +515,17 @@ const styles = StyleSheet.create({
   msgName: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.text,
+    color: COLORS.ink,
     flex: 1,
     marginRight: 8,
   },
   msgTime: {
     fontSize: 12,
-    color: COLORS.textTertiary,
+    color: COLORS.graphiteLight,
   },
   msgPreview: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: COLORS.graphite,
     lineHeight: 18,
   },
 
@@ -464,139 +536,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.lg,
-  },
-
-  composeContainer: {
-    flex: 1,
-  },
-  pickerSection: {
-    flex: 1,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  searchInput: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 12,
-  },
-  teacherRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6,
-    ...SHADOWS.sm,
-  },
-  teacherAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  teacherAvatarText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  teacherName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  teacherRole: {
-    fontSize: 12,
-    color: COLORS.textTertiary,
-    marginTop: 2,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: COLORS.textTertiary,
-    marginTop: 32,
-    fontSize: 15,
-  },
-
-  composeSection: {
-    flex: 1,
-  },
-  composeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  backBtn: {
-    marginRight: 10,
-  },
-  composeTo: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  bodyInput: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    minHeight: 120,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  sendBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  sendBtnDisabled: {
-    opacity: 0.5,
-  },
-  sendBtnText: {
-    color: COLORS.textInverse,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-
-  emptyState: {
-    flex: 1,
+    backgroundColor: COLORS.cover,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
+  fabText: {
+    fontSize: 24,
   },
 });

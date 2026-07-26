@@ -1,10 +1,24 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { useFocusEffect } from 'expo-router';
+import {
+  ScreenHeader,
+  NotebookCard,
+  EmptyState,
+  LoadingScreen,
+  SectionHeader,
+  Avatar,
+} from '../../lib/components';
 
 interface ClassInfo {
   id: string;
@@ -18,16 +32,10 @@ export default function TeacherAttendanceTab() {
   const router = useRouter();
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchClasses();
-    }, [user?.id])
-  );
-
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     if (!user?.id) return;
-    setLoading(true);
 
     const { data } = await supabase
       .from('classes')
@@ -48,68 +56,64 @@ export default function TeacherAttendanceTab() {
       setClasses(withCounts);
     }
     setLoading(false);
-  };
+    setRefreshing(false);
+  }, [user?.id]);
 
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
-  }
+  useFocusEffect(
+    useCallback(() => {
+      fetchClasses();
+    }, [fetchClasses])
+  );
 
-  if (classes.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.headerTitle}>Attendance</Text>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>You are not a class teacher of any class yet.</Text>
-        </View>
-      </View>
-    );
-  }
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchClasses();
+  }, [fetchClasses]);
+
+  if (loading) return <LoadingScreen text="Loading classes..." />;
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={styles.headerTitle}>Attendance</Text>
-      <Text style={styles.subtitle}>Select a class to mark attendance</Text>
-
-      {classes.map((cls) => (
-        <TouchableOpacity
-          key={cls.id}
-          style={styles.classCard}
-          onPress={() => router.push(`/(teacher)/attendance/${cls.id}` as any)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.classIcon}>
-            <Text style={styles.classIconText}>{cls.name[0]}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.className}>{cls.name}</Text>
-            <Text style={styles.classMeta}>Grade {cls.grade_level} · {cls.student_count} students</Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-      ))}
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+    <View style={styles.root}>
+      <ScreenHeader title="Attendance" subtitle="Mark daily attendance" />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} />}
+      >
+        {classes.length === 0 ? (
+          <EmptyState icon="📋" title="No Classes" subtitle="You are not a class teacher of any class yet." />
+        ) : (
+          <>
+            <SectionHeader title="Select a class to mark attendance" />
+            {classes.map((cls) => (
+              <NotebookCard
+                key={cls.id}
+                accent={COLORS.chalk}
+                onPress={() => router.push(`/(teacher)/attendance/${cls.id}` as any)}
+              >
+                <View style={styles.classRow}>
+                  <Avatar name={cls.name} size={44} />
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text style={styles.className}>{cls.name}</Text>
+                    <Text style={styles.classMeta}>Grade {cls.grade_level} · {cls.student_count} students</Text>
+                  </View>
+                  <Text style={styles.arrow}>›</Text>
+                </View>
+              </NotebookCard>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: COLORS.text, letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4, marginBottom: 20 },
-  classCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface,
-    borderRadius: 14, padding: 16, marginBottom: 10, ...SHADOWS.sm,
-  },
-  classIcon: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
-  },
-  classIconText: { fontSize: 18, fontWeight: '800', color: COLORS.primary },
-  className: { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  classMeta: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  arrow: { fontSize: 22, color: COLORS.textSecondary, fontWeight: '300' },
-  emptyContainer: { alignItems: 'center', marginTop: 60 },
-  emptyText: { color: COLORS.textTertiary, fontSize: 15 },
+  root: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.paper, padding: 20 },
+  classRow: { flexDirection: 'row', alignItems: 'center' },
+  className: { fontSize: 16, fontWeight: '700', color: COLORS.ink },
+  classMeta: { fontSize: 13, color: COLORS.graphite, marginTop: 2 },
+  arrow: { fontSize: 22, color: COLORS.graphiteLight, fontWeight: '300' },
 });

@@ -1,19 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Alert,
   TextInput,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import {
+  ScreenHeader,
+  NotebookCard,
+  Badge,
+  EmptyState,
+  LoadingScreen,
+  PrimaryButton,
+  SectionHeader,
+  Divider,
+} from '../../lib/components';
 
 interface Subject {
   id: string;
@@ -48,6 +58,7 @@ export default function AdminSubjectsScreen() {
   const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -59,70 +70,50 @@ export default function AdminSubjectsScreen() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, [profile?.school_id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!profile?.school_id) return;
-    setLoading(true);
 
     const [subjectsRes, assignmentsRes, teachersRes, classesRes] = await Promise.all([
-      supabase
-        .from('subjects')
-        .select('id, name, created_at')
-        .eq('school_id', profile.school_id)
-        .order('name'),
-      supabase
-        .from('teacher_subjects')
-        .select('id, teacher_id, subject_id, class_id, profiles(full_name), classes(name)')
-        .eq('school_id', profile.school_id),
-      supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('school_id', profile.school_id)
-        .eq('role', 'teacher')
-        .order('full_name'),
-      supabase
-        .from('classes')
-        .select('id, name')
-        .eq('school_id', profile.school_id)
-        .order('name'),
+      supabase.from('subjects').select('id, name, created_at').eq('school_id', profile.school_id).order('name'),
+      supabase.from('teacher_subjects').select('id, teacher_id, subject_id, class_id, profiles(full_name), classes(name)').eq('school_id', profile.school_id),
+      supabase.from('profiles').select('id, full_name').eq('school_id', profile.school_id).eq('role', 'teacher').order('full_name'),
+      supabase.from('classes').select('id, name').eq('school_id', profile.school_id).order('name'),
     ]);
 
     if (subjectsRes.data) setSubjects(subjectsRes.data);
     if (assignmentsRes.data) setAssignments(assignmentsRes.data as any);
     if (teachersRes.data) setTeachers(teachersRes.data);
     if (classesRes.data) setClasses(classesRes.data);
-    setLoading(false);
-  };
+  }, [profile?.school_id]);
 
-  const getAssignmentsForSubject = (subjectId: string) =>
-    assignments.filter((a) => a.subject_id === subjectId);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchData();
+      setLoading(false);
+    })();
+  }, [fetchData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  }, [fetchData]);
+
+  const getAssignmentsForSubject = (subjectId: string) => assignments.filter((a) => a.subject_id === subjectId);
 
   const handleCreateSubject = async () => {
     const name = newSubjectName.trim();
-    if (!name) {
-      Alert.alert('Error', 'Subject name is required');
-      return;
-    }
+    if (!name) { Alert.alert('Error', 'Subject name is required'); return; }
     if (!profile?.school_id) return;
 
     setSubmitting(true);
-    const { error } = await supabase.from('subjects').insert({
-      name,
-      school_id: profile.school_id,
-    });
+    const { error } = await supabase.from('subjects').insert({ name, school_id: profile.school_id });
     setSubmitting(false);
-
-    if (error) {
-      Alert.alert('Error', error.message);
-      return;
-    }
-
+    if (error) { Alert.alert('Error', error.message); return; }
     setNewSubjectName('');
     setCreateModalVisible(false);
-    fetchData();
+    await fetchData();
   };
 
   const handleAssign = async () => {
@@ -130,69 +121,33 @@ export default function AdminSubjectsScreen() {
       Alert.alert('Error', 'Please select both a teacher and a class');
       return;
     }
-
     setSubmitting(true);
     const { error } = await supabase.from('teacher_subjects').insert({
-      teacher_id: selectedTeacherId,
-      subject_id: assignSubjectId,
-      class_id: selectedClassId,
-      school_id: profile.school_id,
+      teacher_id: selectedTeacherId, subject_id: assignSubjectId, class_id: selectedClassId, school_id: profile.school_id,
     });
     setSubmitting(false);
-
     if (error) {
-      if (error.code === '23505') {
-        Alert.alert('Duplicate', 'This teacher is already assigned to this subject for the selected class');
-      } else {
-        Alert.alert('Error', error.message);
-      }
+      Alert.alert(error.code === '23505' ? 'Duplicate' : 'Error', error.code === '23505' ? 'Already assigned' : error.message);
       return;
     }
-
     setSelectedTeacherId(null);
     setSelectedClassId(null);
     setAssignModalVisible(false);
-    fetchData();
+    await fetchData();
   };
 
   const handleRemoveAssignment = (assignmentId: string) => {
-    Alert.alert('Remove Assignment', 'Are you sure you want to remove this assignment?', [
+    Alert.alert('Remove', 'Remove this assignment?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('teacher_subjects').delete().eq('id', assignmentId);
-          if (error) {
-            Alert.alert('Error', error.message);
-          } else {
-            fetchData();
-          }
-        },
-      },
+      { text: 'Remove', style: 'destructive', onPress: async () => { await supabase.from('teacher_subjects').delete().eq('id', assignmentId); await fetchData(); } },
     ]);
   };
 
   const handleDeleteSubject = (subject: Subject) => {
-    Alert.alert(
-      'Delete Subject',
-      `Are you sure you want to delete "${subject.name}"? This will also remove all teacher assignments for this subject.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.from('subjects').delete().eq('id', subject.id);
-            if (error) {
-              Alert.alert('Error', error.message);
-            } else {
-              fetchData();
-            }
-          },
-        },
-      ],
-    );
+    Alert.alert('Delete Subject', `Delete "${subject.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('subjects').delete().eq('id', subject.id); await fetchData(); } },
+    ]);
   };
 
   const openAssignModal = (subjectId: string, subjectName: string) => {
@@ -203,243 +158,112 @@ export default function AdminSubjectsScreen() {
     setAssignModalVisible(true);
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  if (loading) return <LoadingScreen text="Loading subjects..." />;
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Subjects</Text>
-          <TouchableOpacity onPress={() => router.push('/(admin)/profile' as any)}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {profile?.full_name?.charAt(0)?.toUpperCase() ?? 'A'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
+      <ScreenHeader title="Subjects" subtitle={`${subjects.length} total`} />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} colors={[COLORS.cover]} />}
+      >
         {subjects.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📖</Text>
-            <Text style={styles.emptyTitle}>No Subjects Yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Create subjects and assign teachers to get started.
-            </Text>
-          </View>
+          <EmptyState icon={'\u{1F4D6}'} title="No Subjects Yet" subtitle="Create subjects and assign teachers." />
         ) : (
           subjects.map((subject) => {
             const subjectAssignments = getAssignmentsForSubject(subject.id);
             const isExpanded = expandedId === subject.id;
-
             return (
               <TouchableOpacity
                 key={subject.id}
-                style={[styles.subjectCard, SHADOWS.sm]}
                 activeOpacity={0.8}
-                onPress={() => toggleExpand(subject.id)}
+                onPress={() => setExpandedId(isExpanded ? null : subject.id)}
                 onLongPress={() => handleDeleteSubject(subject)}
               >
-                <View style={styles.subjectCardHeader}>
-                  <View style={styles.subjectInfo}>
-                    <Text style={styles.subjectName}>{subject.name}</Text>
-                    <Text style={styles.assignmentCount}>
-                      {subjectAssignments.length === 0
-                        ? 'No assignments'
-                        : `${subjectAssignments.length} assignment${subjectAssignments.length !== 1 ? 's' : ''}`}
-                    </Text>
+                <NotebookCard accent={COLORS.tape}>
+                  <View style={styles.subjectHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.subjectName}>{subject.name}</Text>
+                      <Text style={styles.assignmentCount}>
+                        {subjectAssignments.length === 0 ? 'No assignments' : `${subjectAssignments.length} assignment${subjectAssignments.length !== 1 ? 's' : ''}`}
+                      </Text>
+                    </View>
+                    <PrimaryButton title="+ Assign" onPress={() => openAssignModal(subject.id, subject.name)} />
                   </View>
-                  <TouchableOpacity
-                    style={[styles.assignBtn, SHADOWS.sm]}
-                    onPress={() => openAssignModal(subject.id, subject.name)}
-                  >
-                    <Text style={styles.assignBtnText}>+ Assign</Text>
-                  </TouchableOpacity>
-                </View>
 
-                {isExpanded && subjectAssignments.length > 0 && (
-                  <View style={styles.assignmentsList}>
-                    {subjectAssignments.map((assignment) => (
-                      <View key={assignment.id} style={styles.assignmentRow}>
-                        <View style={styles.assignmentInfo}>
-                          <Text style={styles.assignmentTeacher}>
-                            {assignment.profiles?.full_name ?? 'Unknown'}
-                          </Text>
-                          <Text style={styles.assignmentClass}>
-                            {assignment.classes?.name ?? 'Unknown class'}
-                          </Text>
+                  {isExpanded && subjectAssignments.length > 0 && (
+                    <View style={styles.assignmentsList}>
+                      {subjectAssignments.map((a) => (
+                        <View key={a.id} style={styles.assignmentRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.assignmentTeacher}>{a.profiles?.full_name ?? 'Unknown'}</Text>
+                            <Text style={styles.assignmentClass}>{a.classes?.name ?? 'Unknown class'}</Text>
+                          </View>
+                          <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveAssignment(a.id)}>
+                            <Text style={styles.removeBtnText}>{'\u2715'}</Text>
+                          </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                          style={styles.removeBtn}
-                          onPress={() => handleRemoveAssignment(assignment.id)}
-                        >
-                          <Text style={styles.removeBtnText}>✕</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {isExpanded && subjectAssignments.length === 0 && (
-                  <View style={styles.assignmentsList}>
-                    <Text style={styles.noAssignmentsText}>
-                      No teachers assigned yet. Tap "+ Assign" to get started.
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={[styles.expandChevron, isExpanded && styles.expandChevronOpen]}>
-                  ▾
-                </Text>
+                      ))}
+                    </View>
+                  )}
+                  {isExpanded && subjectAssignments.length === 0 && (
+                    <Text style={styles.noAssignText}>No teachers assigned yet. Tap "+ Assign" to get started.</Text>
+                  )}
+                </NotebookCard>
               </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.fab, SHADOWS.lg]}
-        activeOpacity={0.85}
-        onPress={() => {
-          setNewSubjectName('');
-          setCreateModalVisible(true);
-        }}
-      >
+      <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => { setNewSubjectName(''); setCreateModalVisible(true); }}>
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
 
-      {/* Create Subject Modal */}
-      <Modal
-        visible={createModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCreateModalVisible(false)}
-      >
+      <Modal visible={createModalVisible} transparent animationType="fade" onRequestClose={() => setCreateModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create Subject</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Mathematics, English, Science"
-              placeholderTextColor={COLORS.textTertiary}
-              value={newSubjectName}
-              onChangeText={setNewSubjectName}
-              autoFocus
-            />
+            <TextInput style={styles.input} placeholder="e.g. Mathematics" placeholderTextColor={COLORS.graphiteLight} value={newSubjectName} onChangeText={setNewSubjectName} autoFocus />
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setCreateModalVisible(false)}
-              >
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setCreateModalVisible(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-                onPress={handleCreateSubject}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Text style={styles.submitBtnText}>Create Subject</Text>
-                )}
-              </TouchableOpacity>
+              <PrimaryButton title="Create" onPress={handleCreateSubject} disabled={submitting} loading={submitting} />
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Assign Teacher Modal */}
-      <Modal
-        visible={assignModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAssignModalVisible(false)}
-      >
+      <Modal visible={assignModalVisible} transparent animationType="fade" onRequestClose={() => setAssignModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Assign to {assignSubjectName}</Text>
-
             <Text style={styles.pickerLabel}>Teacher</Text>
             <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
-              {teachers.map((teacher) => (
-                <TouchableOpacity
-                  key={teacher.id}
-                  style={[
-                    styles.pickerItem,
-                    selectedTeacherId === teacher.id && styles.pickerItemSelected,
-                  ]}
-                  onPress={() => setSelectedTeacherId(teacher.id)}
-                >
-                  <Text
-                    style={[
-                      styles.pickerItemText,
-                      selectedTeacherId === teacher.id && styles.pickerItemTextSelected,
-                    ]}
-                  >
-                    {teacher.full_name}
-                  </Text>
+              {teachers.map((t) => (
+                <TouchableOpacity key={t.id} style={[styles.pickerItem, selectedTeacherId === t.id && styles.pickerItemSelected]} onPress={() => setSelectedTeacherId(t.id)}>
+                  <Text style={[styles.pickerItemText, selectedTeacherId === t.id && styles.pickerItemTextSelected]}>{t.full_name}</Text>
                 </TouchableOpacity>
               ))}
-              {teachers.length === 0 && (
-                <Text style={styles.emptyPickerText}>No teachers found</Text>
-              )}
+              {teachers.length === 0 && <Text style={styles.emptyPickerText}>No teachers found</Text>}
             </ScrollView>
-
             <Text style={styles.pickerLabel}>Class</Text>
             <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
-              {classes.map((cls) => (
-                <TouchableOpacity
-                  key={cls.id}
-                  style={[
-                    styles.pickerItem,
-                    selectedClassId === cls.id && styles.pickerItemSelected,
-                  ]}
-                  onPress={() => setSelectedClassId(cls.id)}
-                >
-                  <Text
-                    style={[
-                      styles.pickerItemText,
-                      selectedClassId === cls.id && styles.pickerItemTextSelected,
-                    ]}
-                  >
-                    {cls.name}
-                  </Text>
+              {classes.map((c) => (
+                <TouchableOpacity key={c.id} style={[styles.pickerItem, selectedClassId === c.id && styles.pickerItemSelected]} onPress={() => setSelectedClassId(c.id)}>
+                  <Text style={[styles.pickerItemText, selectedClassId === c.id && styles.pickerItemTextSelected]}>{c.name}</Text>
                 </TouchableOpacity>
               ))}
-              {classes.length === 0 && (
-                <Text style={styles.emptyPickerText}>No classes found</Text>
-              )}
+              {classes.length === 0 && <Text style={styles.emptyPickerText}>No classes found</Text>}
             </ScrollView>
-
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setAssignModalVisible(false)}
-              >
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setAssignModalVisible(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-                onPress={handleAssign}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Text style={styles.submitBtnText}>Assign</Text>
-                )}
-              </TouchableOpacity>
+              <PrimaryButton title="Assign" onPress={handleAssign} disabled={submitting} loading={submitting} />
             </View>
           </View>
         </View>
@@ -449,267 +273,46 @@ export default function AdminSubjectsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    padding: 20,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.bg,
-  },
-  content: {
-    paddingBottom: 100,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  subjectCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-  },
-  subjectCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  subjectInfo: {
-    flex: 1,
-  },
-  subjectName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  assignmentCount: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  assignBtn: {
-    backgroundColor: COLORS.primaryBg,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  assignBtnText: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  assignmentsList: {
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.borderLight,
-    paddingTop: 10,
-  },
+  container: { flex: 1, backgroundColor: COLORS.paper },
+  scroll: { flex: 1 },
+  content: { padding: 16, paddingBottom: 100 },
+
+  subjectHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  subjectName: { fontSize: 16, fontWeight: '700', color: COLORS.ink },
+  assignmentCount: { fontSize: 12, color: COLORS.graphite, marginTop: 2 },
+
+  assignmentsList: { marginTop: 10, borderTopWidth: 1, borderTopColor: COLORS.line, paddingTop: 8 },
   assignmentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.surfaceAlt,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 6,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: COLORS.paperDim, borderRadius: 8, padding: 10, marginBottom: 6,
   },
-  assignmentInfo: {
-    flex: 1,
-  },
-  assignmentTeacher: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.text,
-  },
-  assignmentClass: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 1,
-  },
-  removeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.dangerBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  removeBtnText: {
-    color: COLORS.danger,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  noAssignmentsText: {
-    fontSize: 13,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
-    paddingVertical: 8,
-  },
-  expandChevron: {
-    textAlign: 'center',
-    color: COLORS.textTertiary,
-    fontSize: 14,
-    marginTop: 6,
-  },
-  expandChevronOpen: {
-    transform: [{ rotate: '180deg' }],
-  },
+  assignmentTeacher: { fontSize: 13, fontWeight: '500', color: COLORS.ink },
+  assignmentClass: { fontSize: 11, color: COLORS.graphite, marginTop: 1 },
+  removeBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.dangerBg, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+  removeBtnText: { color: COLORS.danger, fontSize: 14, fontWeight: '700' },
+  noAssignText: { fontSize: 12, color: COLORS.graphiteLight, textAlign: 'center', paddingVertical: 8 },
+
   fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28,
+    backgroundColor: COLORS.cover, justifyContent: 'center', alignItems: 'center',
+    elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8,
   },
-  fabIcon: {
-    color: COLORS.white,
-    fontSize: 28,
-    fontWeight: '400',
-    marginTop: -2,
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 80,
-  },
-  emptyIcon: {
-    fontSize: 64,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalContent: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 24,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 16,
-  },
+  fabIcon: { color: COLORS.paper, fontSize: 28, fontWeight: '400', marginTop: -2 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 24 },
+  modalContent: { backgroundColor: COLORS.paper, borderRadius: 16, padding: 24, maxHeight: '80%' },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: COLORS.ink, marginBottom: 16 },
   input: {
-    backgroundColor: COLORS.surfaceAlt,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: COLORS.text,
-    marginBottom: 16,
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, borderRadius: 12, padding: 14, fontSize: 15, color: COLORS.ink, marginBottom: 16,
   },
-  pickerLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: 8,
-  },
-  pickerScroll: {
-    maxHeight: 160,
-    marginBottom: 12,
-  },
-  pickerItem: {
-    backgroundColor: COLORS.surfaceAlt,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 6,
-  },
-  pickerItemSelected: {
-    backgroundColor: COLORS.primaryBg,
-    borderColor: COLORS.primary,
-  },
-  pickerItemText: {
-    fontSize: 14,
-    color: COLORS.text,
-  },
-  pickerItemTextSelected: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  emptyPickerText: {
-    fontSize: 13,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
-    paddingVertical: 12,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 8,
-  },
-  cancelBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: COLORS.surfaceAlt,
-  },
-  cancelBtnText: {
-    color: COLORS.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  submitBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: COLORS.primary,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  submitBtnDisabled: {
-    opacity: 0.6,
-  },
-  submitBtnText: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  pickerLabel: { fontSize: 13, fontWeight: '600', color: COLORS.ink, marginBottom: 8 },
+  pickerScroll: { maxHeight: 140, marginBottom: 12 },
+  pickerItem: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, borderRadius: 10, padding: 12, marginBottom: 6 },
+  pickerItemSelected: { backgroundColor: COLORS.chalkSoft, borderColor: COLORS.chalk },
+  pickerItemText: { fontSize: 13, color: COLORS.ink },
+  pickerItemTextSelected: { color: COLORS.chalk, fontWeight: '600' },
+  emptyPickerText: { fontSize: 12, color: COLORS.graphiteLight, textAlign: 'center', paddingVertical: 12 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
+  cancelBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: COLORS.surfaceAlt },
+  cancelBtnText: { color: COLORS.graphite, fontSize: 14, fontWeight: '600' },
 });

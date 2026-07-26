@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  RefreshControl,
+} from 'react-native';
 import { useAuth } from '../../lib/auth';
 import { COLORS, SHADOWS } from '../../lib/theme';
+import { useRouter } from 'expo-router';
 import { getSavedAccounts, removeAccount, type SavedAccount } from '../../lib/accounts';
+import {
+  PageHeader,
+  NotebookCard,
+  Avatar,
+  InfoRow,
+  PrimaryButton,
+  SectionHeader,
+  LoadingScreen,
+} from '../../lib/components';
 
 export default function StudentProfileScreen() {
   const { user, profile, logout } = useAuth();
+  const router = useRouter();
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     getSavedAccounts().then(setSavedAccounts);
@@ -34,41 +54,52 @@ export default function StudentProfileScreen() {
     ]);
   };
 
-  const otherAccounts = savedAccounts.filter(a => a.email !== user?.email);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await getSavedAccounts().then(setSavedAccounts);
+    setRefreshing(false);
+  };
+
+  const otherAccounts = savedAccounts.filter((a) => a.email !== user?.email);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-      </View>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={COLORS.tape}
+          colors={[COLORS.tape]}
+        />
+      }
+    >
+      <View style={styles.body}>
+        <PageHeader
+          title="Profile"
+          subtitle={user?.email}
+        />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.avatarLarge}>
-          <Text style={styles.avatarText}>{(profile?.full_name || 'S')[0]}</Text>
+        <View style={styles.avatarSection}>
+          <Avatar
+            name={profile?.full_name || 'Student'}
+            size={80}
+            color={COLORS.tape}
+          />
+          <Text style={styles.name}>{profile?.full_name || 'Student'}</Text>
+          <Text style={styles.email}>{user?.email}</Text>
         </View>
-        <Text style={styles.name}>{profile?.full_name || 'Student'}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
 
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Grade</Text>
-            <Text style={styles.infoValue}>{profile?.grade_level || '—'}</Text>
-          </View>
-          <View style={styles.infoDivider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Roll No.</Text>
-            <Text style={styles.infoValueMono}>{profile?.roll_number || '—'}</Text>
-          </View>
-          <View style={styles.infoDivider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>House</Text>
-            <Text style={styles.infoValue}>{profile?.house || '—'}</Text>
-          </View>
-        </View>
+        <NotebookCard>
+          <InfoRow label="Grade" value={profile?.grade_level || '—'} icon="📚" />
+          <InfoRow label="Roll No." value={profile?.roll_number || '—'} icon="🔢" />
+          <InfoRow label="House" value={profile?.house || '—'} icon="🏠" />
+        </NotebookCard>
 
         {otherAccounts.length > 0 && (
-          <View style={styles.switchSection}>
-            <Text style={styles.sectionLabel}>Switch Account</Text>
+          <>
+            <SectionHeader title="Switch Account" />
             {otherAccounts.map((account) => (
               <TouchableOpacity
                 key={account.email}
@@ -76,131 +107,89 @@ export default function StudentProfileScreen() {
                 onPress={() => {
                   Alert.alert('Switch Account', `Switch to ${account.full_name || account.email}?`, [
                     { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Switch',
-                      onPress: async () => {
-                        await logout();
-                      },
-                    },
+                    { text: 'Switch', onPress: async () => { await logout(); } },
                   ]);
                 }}
                 onLongPress={() => handleRemoveAccount(account)}
                 activeOpacity={0.7}
               >
-                <View style={styles.switchAvatar}>
-                  <Text style={styles.switchAvatarText}>{(account.full_name || account.email)[0].toUpperCase()}</Text>
-                </View>
+                <Avatar
+                  name={account.full_name || account.email}
+                  size={36}
+                  color={COLORS.graphite}
+                />
                 <View style={styles.switchInfo}>
                   <Text style={styles.switchName}>{account.full_name || account.email}</Text>
                   <Text style={styles.switchEmail}>{account.email}</Text>
                 </View>
               </TouchableOpacity>
             ))}
-          </View>
+          </>
         )}
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+        <View style={{ marginTop: 16 }}>
+          <PrimaryButton
+            title="Log Out"
+            onPress={handleLogout}
+            variant="danger"
+            icon="🚪"
+          />
+        </View>
+
+        <View style={{ height: 32 }} />
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.primaryDark,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.paper,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.surface,
-    letterSpacing: -0.5,
+  body: {
+    padding: 20,
   },
-  content: { alignItems: 'center', padding: 24 },
-  avatarLarge: {
-    width: 88,
-    height: 88,
-    borderRadius: 22,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
+
+  avatarSection: {
     alignItems: 'center',
-    marginTop: 24,
+    paddingVertical: 16,
     marginBottom: 16,
   },
-  avatarText: { fontSize: 36, fontWeight: '800', color: COLORS.primary },
-  name: { fontSize: 22, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-  email: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 28 },
-  infoCard: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 16,
-    ...SHADOWS.sm,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  infoLabel: { fontSize: 14, color: COLORS.textSecondary },
-  infoValue: { fontSize: 14, fontWeight: '600', color: COLORS.text, textTransform: 'capitalize' },
-  infoValueMono: { fontSize: 14, fontWeight: '600', color: COLORS.text, fontFamily: 'Courier' },
-  infoDivider: { height: 1, backgroundColor: COLORS.borderLight },
-  switchSection: {
-    width: '100%',
-    marginTop: 24,
-  },
-  sectionLabel: {
-    fontSize: 12,
+  name: {
+    fontSize: 22,
     fontWeight: '700',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 10,
+    color: COLORS.ink,
+    marginTop: 12,
+    marginBottom: 4,
   },
+  email: {
+    fontSize: 14,
+    color: COLORS.graphite,
+  },
+
   switchCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.line,
   },
-  switchAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+  switchInfo: {
+    flex: 1,
+    marginLeft: 12,
   },
-  switchAvatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.primary,
+  switchName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.ink,
   },
-  switchInfo: { flex: 1 },
-  switchName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  switchEmail: { fontSize: 12, color: COLORS.textSecondary },
-  logoutButton: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: COLORS.danger + '40',
-    ...SHADOWS.sm,
+  switchEmail: {
+    fontSize: 12,
+    color: COLORS.graphite,
+    marginTop: 2,
   },
-  logoutText: { fontSize: 16, fontWeight: '700', color: COLORS.danger },
 });

@@ -5,164 +5,84 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '../../lib/auth';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
+import {
+  PageHeader,
+  NotebookCard,
+  Avatar,
+  InfoRow,
+  Divider,
+} from '../../lib/components';
 
 export default function AdminProfile() {
   const { profile, logout } = useAuth();
   const [schoolName, setSchoolName] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchSchool = async () => {
-      if (!profile?.school_id) return;
-      const { data } = await supabase
-        .from('schools')
-        .select('name')
-        .eq('id', profile.school_id)
-        .single();
-      if (data) setSchoolName(data.name);
-    };
-    fetchSchool();
-  }, [profile?.school_id]);
+  const fetchSchool = async () => {
+    if (!profile?.school_id) return;
+    const { data } = await supabase.from('schools').select('name').eq('id', profile.school_id).single();
+    if (data) setSchoolName(data.name);
+  };
+
+  useEffect(() => { fetchSchool(); }, [profile?.school_id]);
+
+  const onRefresh = async () => { setRefreshing(true); await fetchSchool(); setRefreshing(false); };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
+    Alert.alert('Logout', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: logout,
-      },
+      { text: 'Logout', style: 'destructive', onPress: logout },
     ]);
   };
 
-  const initials = profile?.full_name?.charAt(0)?.toUpperCase() ?? 'A';
-
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
+      <View style={styles.cover}>
+        <PageHeader title="Profile" />
       </View>
-
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} colors={[COLORS.cover]} />}
+      >
         <View style={styles.avatarSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          <Avatar name={profile?.full_name || 'A'} size={80} />
           <Text style={styles.name}>{profile?.full_name ?? 'Admin'}</Text>
-          <Text style={styles.email}>{schoolName || 'School Admin'}</Text>
+          <Text style={styles.school}>{schoolName || 'School Admin'}</Text>
         </View>
 
-        <View style={[styles.infoCard, SHADOWS.sm]}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Role</Text>
-            <Text style={styles.infoValue}>Admin</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>School</Text>
-            <Text style={styles.infoValue}>{schoolName || '—'}</Text>
-          </View>
-        </View>
+        <NotebookCard>
+          <InfoRow label="Role" value="Admin" icon={'\u{1F451}'} />
+          <InfoRow label="School" value={schoolName || '\u2014'} icon={'\u{1F3EB}'} />
+          <InfoRow label="Joined" value={'\u2014'} icon={'\u{1F4C5}'} />
+        </NotebookCard>
 
-        <TouchableOpacity
-          style={[styles.logoutCard, { borderColor: COLORS.danger + '40' }]}
-          onPress={handleLogout}
-        >
+        <TouchableOpacity style={styles.logoutCard} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    backgroundColor: COLORS.primaryDark,
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginBottom: 28,
-    marginTop: 12,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 22,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  avatarText: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  name: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  email: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  infoCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 20,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginVertical: 12,
-  },
+  container: { flex: 1, backgroundColor: COLORS.paper },
+  cover: { backgroundColor: COLORS.cover, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+  content: { padding: 16 },
+
+  avatarSection: { alignItems: 'center', marginBottom: 20, marginTop: 12 },
+  name: { fontSize: 20, fontWeight: '700', color: COLORS.ink, marginTop: 12, marginBottom: 2 },
+  school: { fontSize: 13, color: COLORS.graphite },
+
   logoutCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    alignItems: 'center',
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.danger + '40',
+    borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 16,
   },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.danger,
-  },
+  logoutText: { fontSize: 15, fontWeight: '600', color: COLORS.danger },
 });

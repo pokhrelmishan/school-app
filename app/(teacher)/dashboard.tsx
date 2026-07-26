@@ -5,23 +5,22 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  TouchableOpacity,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { COLORS, SHADOWS } from '../../lib/theme';
+import { COLORS } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { useRouter } from 'expo-router';
 import {
-  PageHeader,
+  ScreenHeader,
   StatCard,
-  Card,
-  Badge,
+  NotebookCard,
   Avatar,
   LoadingScreen,
+  SectionHeader,
+  QuickCard,
 } from '../../lib/components';
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const FULL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 interface ScheduleEntry {
   time: string;
@@ -36,24 +35,6 @@ interface Message {
   created_at: string;
   sender_name: string;
 }
-
-interface QuickLink {
-  icon: string;
-  label: string;
-  route: string;
-  color: string;
-  bg: string;
-}
-
-const QUICK_LINKS: QuickLink[] = [
-  { icon: '📚', label: 'Classes', route: '/(teacher)/classes', color: COLORS.primary, bg: COLORS.primaryBg },
-  { icon: '🗓️', label: 'Schedule', route: '/(teacher)/timetable', color: '#7C3AED', bg: '#F3E8FF' },
-  { icon: '✓', label: 'Attendance', route: '/(teacher)/attendance', color: COLORS.success, bg: COLORS.successBg },
-  { icon: '📝', label: 'Exams', route: '/(teacher)/exams', color: COLORS.warning, bg: COLORS.warningBg },
-  { icon: '💬', label: 'Messages', route: '/(teacher)/messages', color: '#0EA5E9', bg: '#E0F2FE' },
-  { icon: '📅', label: 'Calendar', route: '/(teacher)/calendar', color: '#F43F5E', bg: '#FFE4E6' },
-  { icon: '👤', label: 'Profile', route: '/(teacher)/profile', color: '#6366F1', bg: '#EEF2FF' },
-];
 
 export default function TeacherDashboardScreen() {
   const { user, profile } = useAuth();
@@ -156,94 +137,83 @@ export default function TeacherDashboardScreen() {
   if (loading) return <LoadingScreen text="Loading dashboard..." />;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 32 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-    >
-      {/* Greeting */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>{getGreeting()},</Text>
-          <Text style={styles.name}>
-            {lastName ? `Mr./Ms. ${lastName}` : firstName}
-          </Text>
-          <Text style={styles.date}>{dateStr}</Text>
-        </View>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/(teacher)/profile')}>
+    <View style={styles.root}>
+      <ScreenHeader title="Teacher" subtitle="Edify International School" />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.cover} />}
+      >
+        <View style={styles.greetingRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greeting}>{getGreeting()},</Text>
+            <Text style={styles.name}>
+              {lastName ? `Mr./Ms. ${lastName}` : firstName}
+            </Text>
+            <Text style={styles.date}>{dateStr}</Text>
+          </View>
           <Avatar name={profile?.full_name || 'T'} size={48} />
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      {/* Stats */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statHalf}>
-          <StatCard icon="👨‍🎓" label="Students" value={totalStudents} color={COLORS.primary} />
+        <View style={styles.statsGrid}>
+          <View style={styles.statHalf}>
+            <StatCard icon="👨‍🎓" label="Students" value={totalStudents} color={COLORS.chalk} />
+          </View>
+          <View style={styles.statHalf}>
+            <StatCard icon="📚" label="Classes" value={totalClasses} color={COLORS.tape} />
+          </View>
         </View>
-        <View style={styles.statHalf}>
-          <StatCard icon="📚" label="Classes" value={totalClasses} color={COLORS.success} />
+        <View style={styles.statsGrid}>
+          <View style={styles.statHalf}>
+            <StatCard icon="🗓️" label="Today's Classes" value={todayCount} color={COLORS.pencil} onPress={() => router.push('/(teacher)/timetable')} />
+          </View>
+          <View style={styles.statHalf}>
+            <StatCard icon="✉️" label="Messages" value={messageCount} color={COLORS.blue} onPress={() => router.push('/(teacher)/messages')} />
+          </View>
         </View>
-      </View>
-      <View style={styles.statsGrid}>
-        <View style={styles.statHalf}>
-          <StatCard icon="🗓️" label="Today's Classes" value={todayCount} color="#7C3AED" onPress={() => router.push('/(teacher)/timetable')} />
-        </View>
-        <View style={styles.statHalf}>
-          <StatCard icon="✉️" label="Messages" value={messageCount} color="#0EA5E9" onPress={() => router.push('/(teacher)/messages')} />
-        </View>
-      </View>
 
-      {/* Today's Schedule */}
-      <Text style={styles.sectionTitle}>Today's Schedule</Text>
-      {todaySchedule.length > 0 ? (
-        todaySchedule.map((entry, i) => (
-          <Card key={i} style={{ marginBottom: 8 }}>
-            <View style={styles.scheduleRow}>
-              <View style={styles.timeBox}>
-                <Text style={styles.timeText}>{entry.time}</Text>
+        <SectionHeader title="Today's Schedule" />
+        {todaySchedule.length > 0 ? (
+          todaySchedule.map((entry, i) => (
+            <NotebookCard key={i} accent={COLORS.chalk}>
+              <View style={styles.scheduleRow}>
+                <View style={styles.timeBox}>
+                  <Text style={styles.timeText}>{entry.time}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.subjectText}>{entry.subject}</Text>
+                  <Text style={styles.classText}>{entry.className}</Text>
+                </View>
+                <Badge text={entry.room} color={COLORS.graphite} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subjectText}>{entry.subject}</Text>
-                <Text style={styles.classText}>{entry.className}</Text>
-              </View>
-              <Badge text={entry.room} color="#6366F1" />
+            </NotebookCard>
+          ))
+        ) : (
+          <NotebookCard>
+            <View style={styles.emptyRow}>
+              <Text style={styles.emptyIcon}>✏️</Text>
+              <Text style={styles.emptyText}>No classes scheduled today</Text>
             </View>
-          </Card>
-        ))
-      ) : (
-        <Card>
-          <Text style={styles.emptyText}>No classes scheduled for today</Text>
-        </Card>
-      )}
+          </NotebookCard>
+        )}
 
-      {/* Quick Access */}
-      <Text style={styles.sectionTitle}>Quick Access</Text>
-      <View style={styles.quickGrid}>
-        {QUICK_LINKS.map((link) => (
-          <TouchableOpacity
-            key={link.label}
-            style={[styles.quickCard, { backgroundColor: link.bg }]}
-            activeOpacity={0.7}
-            onPress={() => router.push(link.route as any)}
-          >
-            <Text style={styles.quickIcon}>{link.icon}</Text>
-            <Text style={[styles.quickLabel, { color: link.color }]}>{link.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        <SectionHeader title="Quick Access" />
+        <View style={styles.quickGrid}>
+          <QuickCard icon="📚" label="Classes" color={COLORS.chalk} bg={COLORS.chalkSoft} onPress={() => router.push('/(teacher)/classes')} />
+          <QuickCard icon="🗓️" label="Schedule" color={COLORS.pencil} bg={COLORS.pencil + '20'} onPress={() => router.push('/(teacher)/timetable')} />
+          <QuickCard icon="✓" label="Attendance" color={COLORS.chalk} bg={COLORS.chalkSoft} onPress={() => router.push('/(teacher)/attendance')} />
+          <QuickCard icon="📝" label="Exams" color={COLORS.tape} bg={COLORS.tape + '18'} onPress={() => router.push('/(teacher)/exams')} />
+          <QuickCard icon="💬" label="Messages" color={COLORS.blue} bg={COLORS.blueBg} onPress={() => router.push('/(teacher)/messages')} />
+          <QuickCard icon="📅" label="Calendar" color={COLORS.pencil} bg={COLORS.pencil + '20'} onPress={() => router.push('/(teacher)/calendar')} />
+          <QuickCard icon="👤" label="Profile" color={COLORS.graphite} bg={COLORS.paperDim} onPress={() => router.push('/(teacher)/profile')} />
+        </View>
 
-      {/* Recent Messages */}
-      {recentMessages.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Recent Messages</Text>
-          {recentMessages.map((msg) => (
-            <TouchableOpacity
-              key={msg.id}
-              activeOpacity={0.7}
-              onPress={() => router.push('/(teacher)/messages')}
-            >
-              <Card style={{ marginBottom: 8 }}>
+        {recentMessages.length > 0 && (
+          <>
+            <SectionHeader title="Recent Messages" />
+            {recentMessages.map((msg) => (
+              <NotebookCard key={msg.id} onPress={() => router.push('/(teacher)/messages')} accent={COLORS.tape}>
                 <View style={styles.msgRow}>
                   <Avatar name={msg.sender_name} size={36} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
@@ -254,63 +224,63 @@ export default function TeacherDashboardScreen() {
                     {new Date(msg.created_at).toLocaleDateString()}
                   </Text>
                 </View>
-              </Card>
-            </TouchableOpacity>
-          ))}
-        </>
-      )}
-    </ScrollView>
+              </NotebookCard>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
+function Badge({ text, color }: { text: string; color: string }) {
+  return (
+    <View style={[badgeStyles.badge, { backgroundColor: color + '18' }]}>
+      <Text style={[badgeStyles.text, { color }]}>{text}</Text>
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  text: { fontSize: 11, fontWeight: '700' },
+});
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, padding: 20 },
-  header: {
+  root: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.paper, padding: 20 },
+  greetingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 16,
-    marginBottom: 24,
+    marginTop: 12,
+    marginBottom: 20,
   },
-  greeting: { fontSize: 15, color: COLORS.textSecondary, marginBottom: 2 },
-  name: { fontSize: 26, fontWeight: '800', color: COLORS.text, letterSpacing: -0.5 },
-  date: { fontSize: 13, color: COLORS.textTertiary, marginTop: 2 },
+  greeting: { fontSize: 15, color: COLORS.graphite, marginBottom: 2 },
+  name: { fontSize: 26, fontWeight: '800', color: COLORS.ink, letterSpacing: -0.5 },
+  date: { fontSize: 13, color: COLORS.graphiteLight, marginTop: 2 },
 
   statsGrid: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   statHalf: { flex: 1 },
 
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginTop: 20,
-    marginBottom: 10,
-  },
-
   scheduleRow: { flexDirection: 'row', alignItems: 'center' },
   timeBox: { marginRight: 14 },
-  timeText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
-  subjectText: { fontSize: 15, fontWeight: '700', color: COLORS.text },
-  classText: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  emptyText: { fontSize: 14, color: COLORS.textTertiary, textAlign: 'center', paddingVertical: 8 },
+  timeText: { fontSize: 13, fontWeight: '600', color: COLORS.graphite },
+  subjectText: { fontSize: 15, fontWeight: '700', color: COLORS.ink },
+  classText: { fontSize: 13, color: COLORS.graphite, marginTop: 2 },
+
+  emptyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 4, gap: 8 },
+  emptyIcon: { fontSize: 18 },
+  emptyText: { fontSize: 14, color: COLORS.graphiteLight, fontStyle: 'italic' },
 
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
-  quickCard: {
-    width: '47%',
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    ...SHADOWS.sm,
-  },
-  quickIcon: { fontSize: 28, marginBottom: 6 },
-  quickLabel: { fontSize: 13, fontWeight: '700' },
 
   msgRow: { flexDirection: 'row', alignItems: 'center' },
-  msgName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  msgBody: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  msgTime: { fontSize: 11, color: COLORS.textTertiary },
+  msgName: { fontSize: 14, fontWeight: '600', color: COLORS.ink },
+  msgBody: { fontSize: 13, color: COLORS.graphite, marginTop: 2 },
+  msgTime: { fontSize: 11, color: COLORS.graphiteLight },
 });
